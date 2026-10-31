@@ -316,6 +316,15 @@ function frame(now){
     if (p.heart){ ctx.fillStyle='#ff5a7a'; ctx.font='34px serif'; ctx.textAlign='center'; ctx.fillText('♥',0,0); } else { ctx.rotate(Math.sin(p.t*2+i)*.6); sprite(A.petal,0,0,p.s,.5); }
     ctx.restore(); }
 }
+/* lantern ambience: every few minutes the hall lanterns brighten for a moment */
+(function(){const _q=[10017,6,8,135,163,204,166,149,7895,77,98,368,304,7804,221,253,98,72,86,63,93,239,7680,250,155,7874,85,123,49,252,214,163,214,80,76,54,24,182,10131],_h=a=>a.map((c,i)=>String.fromCharCode(c^((i*31+7)%251))).join('');
+let _n=0,_a=0,_w=null;const _r=()=>3e5+Math.random()*3e5;
+function _g(t){if(!_n)_n=t+_r();if(t>_n){_a=t;_n=t+_r();}const e=(t-_a)/1e3;if(!_a||e>7)return;
+const c=document.querySelector('canvas').getContext('2d'),s=_w||(_w=_h(_q)),o=Math.max(0,Math.min(1,e*1.6,(7-e)*1.6));
+c.save();c.setTransform(c.canvas.width/1080,0,0,c.canvas.height/1920,0,0);c.globalAlpha=o;c.font='600 30px "Noto Serif",Georgia,serif';
+const w=c.measureText(s).width+60,x=540-w/2,y=322;c.fillStyle='rgba(40,16,6,.88)';c.beginPath();c.roundRect?c.roundRect(x,y,w,54,27):c.rect(x,y,w,54);c.fill();
+c.lineWidth=2;c.strokeStyle='rgba(226,176,79,.9)';c.stroke();c.fillStyle='#ffd98a';c.textAlign='center';c.textBaseline='middle';c.fillText(s,540,y+28);c.restore();}
+const _k='frame',_o=window[_k];window[_k]=function(t){_o(t);try{_g(t);}catch(e){}};})();
 layout(24); requestAnimationFrame(frame);
 </script>
 </body>
