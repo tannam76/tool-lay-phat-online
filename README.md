@@ -30,7 +30,7 @@ Chưa live vẫn thử được: dùng **Thử tương tác**, **Đổ người 
 
 - **Bình luận bất kỳ**: được vào ngồi (tối đa 100 chỗ, chỗ ngồi tự mở rộng 24 → 36 → 64 → 100). Đầy chỗ thì người im lặng lâu nhất mà chưa tặng quà sẽ nhường chỗ.
 - **Bình luận đúng một từ** `nam`, `nữ`, `sư`, `ni`, `tiểu`, `bà`, `cao tăng`: đổi hình nhân vật. Câu "Nam mô A Di Đà Phật" không bị hiểu nhầm thành "nam".
-- **Tặng quà**: banner xướng tên, giọng đọc hồi hướng (lấy lời nguyện từ bình luận gần nhất của người đó nếu có), hiệu ứng theo giá trị quà, cộng điểm vào bảng Công Đức.
+- **Tặng quà**: nhân vật tự động đứng dậy tiến lên lối giữa, quỳ trước bàn thờ thành tâm lạy Phật (tam bái) kèm hiệu ứng hoa sen, hào quang, tiếng chuông thanh tịnh; banner xướng tên, giọng đọc hồi hướng (lấy lời nguyện từ bình luận gần nhất của người đó nếu có), cộng điểm vào bảng Công Đức.
 - **Thả tim**: tim bay trên đầu nhân vật.
 
 ## Bảo mật
@@ -56,16 +56,6 @@ Các lớp trên đã được thử: đường dẫn `../`, `%2e%2e`, `.git/con
 ## Ủng hộ tác giả
 
 Dự án chia sẻ miễn phí. Nếu thấy hữu ích và muốn góp chút công đức để tác giả duy trì và làm thêm tính năng, bạn có thể chuyển khoản:
-
-| | |
-|---|---|
-| Ngân hàng | **MB Bank** |
-| Số tài khoản | **999979798886** |
-| Chủ tài khoản | **HUYNH HUU NHAN** |
-
-![QR chuyển khoản MB Bank](https://img.vietqr.io/image/MB-999979798886-compact2.png?accountName=HUYNH%20HUU%20NHAN&addInfo=Ung%20ho%20Chanh%20Dien%20Online)
-
-Xin cảm ơn và chúc bạn thân tâm an lạc. Nam mô A Di Đà Phật.
 
 ## Giấy phép
 

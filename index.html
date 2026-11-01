@@ -91,6 +91,7 @@ input::placeholder{color:#7d6a52}
       <button class="btn gift" data-coins="99" data-fx="bell"><b>Thỉnh chuông</b><small>99 coins</small></button>
     </span>
     <span class="row">
+      <button class="btn" id="btnScene" hidden title="Đổi khung cảnh"><span>🏯 Sân chùa</span></button>
       <button class="btn" id="nextTrack" hidden title="Bài kế tiếp"><span id="nowPlaying">♪</span> ›</button>
       <button class="btn" id="mute" hidden aria-pressed="false">Tắt nhạc</button>
       <button class="btn" id="leave" hidden>Rời</button>
@@ -108,6 +109,15 @@ input::placeholder{color:#7d6a52}
         <button type="button" data-skin="man" aria-pressed="true">Nam áo lam</button>
         <button type="button" data-skin="woman" aria-pressed="false">Nữ áo lam</button>
         <button type="button" data-skin="granny" aria-pressed="false">Áo nâu</button>
+      </div>
+      <label>Khung cảnh</label>
+      <div class="seg" id="scene">
+        <button type="button" data-scene="hall" aria-pressed="true">Sân chùa</button>
+        <button type="button" data-scene="dawn" aria-pressed="false">Sớm mai</button>
+        <button type="button" data-scene="moon" aria-pressed="false">Trăng đêm</button>
+        <button type="button" data-scene="lotus" aria-pressed="false">Sen hương</button>
+        <button type="button" data-scene="sunset" aria-pressed="false">Hoàng hôn</button>
+        <button type="button" data-scene="bamboo" aria-pressed="false">Rừng trúc</button>
       </div>
       <div class="row">
         <button type="submit" class="btn primary">Vào chánh điện</button>
@@ -168,15 +178,176 @@ const DOOR = { x: SW/2, y: SH + 120 };         // walk in from below the frame
 /* ---- visitors ---- */
 const visitors = [], fx = [], floaters = [];
 const SKINS = ['man','woman','granny','man','woman','nun','monk','child'];
+const SCENE_PRESETS = {
+  hall: {
+    label: 'Sân chùa',
+    icon: '🏯',
+    top: '#120a06',
+    bottom: '#2f180d',
+    panel: 'rgba(26,14,9,.84)',
+    line: 'rgba(217,164,65,.38)',
+    gold: '#d9a441',
+    gold2: '#ffd98a',
+    filter: 'none',
+    haloColor: 'rgba(255,200,100,.35)',
+    candleColor: '#ffb347',
+  },
+  dawn: {
+    label: 'Sớm mai',
+    icon: '🌅',
+    top: '#181216',
+    bottom: '#3a201c',
+    panel: 'rgba(32,17,14,.84)',
+    line: 'rgba(255,189,120,.45)',
+    gold: '#f3b968',
+    gold2: '#ffe4a6',
+    filter: 'brightness(1.03) contrast(1.04) saturate(1.15) hue-rotate(-6deg)',
+    haloColor: 'rgba(255,215,130,.40)',
+    candleColor: '#ffd480',
+  },
+  moon: {
+    label: 'Trăng đêm',
+    icon: '🌙',
+    top: '#090d1a',
+    bottom: '#14182c',
+    panel: 'rgba(13,18,34,.86)',
+    line: 'rgba(145,180,255,.45)',
+    gold: '#9bb8ff',
+    gold2: '#dce6ff',
+    filter: 'brightness(0.60) contrast(1.22) saturate(1.3) hue-rotate(188deg)',
+    haloColor: 'rgba(160,205,255,.50)',
+    candleColor: '#ffd89a',
+  },
+  lotus: {
+    label: 'Sen hương',
+    icon: '🪷',
+    top: '#160b13',
+    bottom: '#2e1423',
+    panel: 'rgba(34,14,24,.85)',
+    line: 'rgba(245,160,190,.45)',
+    gold: '#efa2be',
+    gold2: '#ffe0ed',
+    filter: 'brightness(0.88) contrast(1.10) saturate(1.28) hue-rotate(320deg)',
+    haloColor: 'rgba(255,175,205,.42)',
+    candleColor: '#ffaec9',
+  },
+  sunset: {
+    label: 'Hoàng hôn',
+    icon: '🌇',
+    top: '#1a0b0d',
+    bottom: '#451a14',
+    panel: 'rgba(38,14,12,.86)',
+    line: 'rgba(255,135,85,.50)',
+    gold: '#ffaa6d',
+    gold2: '#ffe1b8',
+    filter: 'brightness(0.86) contrast(1.18) saturate(1.45) sepia(0.2) hue-rotate(-18deg)',
+    haloColor: 'rgba(255,155,60,.45)',
+    candleColor: '#ff7733',
+  },
+  bamboo: {
+    label: 'Rừng trúc',
+    icon: '🎋',
+    top: '#06160d',
+    bottom: '#133522',
+    panel: 'rgba(10,26,16,.86)',
+    line: 'rgba(140,225,160,.45)',
+    gold: '#96e2a6',
+    gold2: '#e5ffe9',
+    filter: 'brightness(0.82) contrast(1.12) saturate(1.26) hue-rotate(82deg)',
+    haloColor: 'rgba(155,245,185,.40)',
+    candleColor: '#ffe599',
+  },
+};
+const SCENE_KEYS = ['hall', 'dawn', 'moon', 'lotus', 'sunset', 'bamboo'];
+let currentScene = 'hall';
+function applyScenePreset(id){
+  const key = SCENE_PRESETS[id] ? id : 'hall';
+  currentScene = key;
+  const preset = SCENE_PRESETS[key];
+  document.documentElement.style.setProperty('--bg', preset.top);
+  document.documentElement.style.setProperty('--panel', preset.panel || 'rgba(26,14,9,.84)');
+  document.documentElement.style.setProperty('--line', preset.line || 'rgba(217,164,65,.38)');
+  document.documentElement.style.setProperty('--gold', preset.gold || '#d9a441');
+  if (preset.gold2) document.documentElement.style.setProperty('--gold2', preset.gold2);
+  const sceneEl = document.getElementById('scene');
+  if (sceneEl) {
+    sceneEl.querySelectorAll('button').forEach(btn => {
+      btn.setAttribute('aria-pressed', String(btn.dataset.scene === key));
+    });
+  }
+  const btnScene = document.getElementById('btnScene');
+  if (btnScene) {
+    btnScene.innerHTML = `<span>${preset.icon || '🏯'} ${preset.label}</span>`;
+  }
+  try { localStorage.setItem('preferredScene', key); } catch(e){}
+  return preset;
+}
 function freeSeat(){ return seats.find(s=>!s.taken) || null; }
 function addVisitor(name, skin, instant, isMe){
   const seat = freeSeat(); if(!seat) return null;
   const v = { name, skin, seat, x: instant?seat.x:DOOR.x, y: instant?seat.y:DOOR.y, state: instant?'sit':'walk', t:0, frame: 7, ft:0, sitT:-1, flip:false, fade: instant?1:0, bob:0, bow:0, glow:0, coins:0, isMe:!!isMe, phase:Math.random()*6.28 };
   seat.taken = v; visitors.push(v); updateCount(); return v;
 }
-function removeVisitor(v){ if(!v) return; v.seat.taken=null; visitors.splice(visitors.indexOf(v),1); updateCount(); }
+function removeVisitor(v){
+  if(!v) return;
+  v.seat.taken = null;
+  visitors.splice(visitors.indexOf(v), 1);
+  updateCount();
+  if (currentPrayV === v) { nextPray(); }
+  else {
+    const idx = prayQueue.findIndex(item => item.v === v);
+    if (idx >= 0) prayQueue.splice(idx, 1);
+  }
+}
 const countEl = document.getElementById('count');
 function updateCount(){ countEl.textContent = visitors.length; }
+
+/* prayer pilgrimage queue & altar mat */
+const PRAY_ALTAR = { x: SW/2, y: 1085 };
+const prayQueue = [];
+let currentPrayV = null;
+
+function triggerPray(v, maxBows, label){
+  if (!v) return;
+  if (currentPrayV === v || prayQueue.some(item => item.v === v)){
+    if (v.state === 'praying') v.maxBows = Math.min(5, (v.maxBows || 3) + 1);
+    return;
+  }
+  if (!currentPrayV){
+    startPray(v, maxBows || 3, label);
+  } else {
+    prayQueue.push({ v, maxBows: maxBows || 3, label });
+  }
+}
+
+function startPray(v, maxBows, label){
+  currentPrayV = v;
+  v.maxBows = maxBows || 3;
+  v.bowCount = 0;
+  v.bowBellTriggered = -1;
+  v.prayT = 0;
+  v.standT = 0;
+  v.glow = 1.3;
+  if (v.state === 'sit'){
+    v.state = 'pray_stand';
+    v.standT = 0;
+  } else if (v.state === 'walk'){
+    v.state = 'pray_walk_up';
+  } else {
+    v.state = 'pray_walk_out';
+  }
+}
+
+function nextPray(){
+  currentPrayV = null;
+  if (!prayQueue.length) return;
+  const item = prayQueue.shift();
+  if (visitors.includes(item.v)){
+    startPray(item.v, item.maxBows, item.label);
+  } else {
+    nextPray();
+  }
+}
 
 // demo crowd so the hall never opens empty (replace with live viewers later)
 const DEMO = ['Diệu Hạnh','Minh Tâm','Thiện Đức','Huệ An','Tịnh Nhã','Quảng Trí','Chơn Như','Pháp Hỷ','Nguyên Thanh','Tâm Đăng','Diệu Liên','Trí Hải','Phước Lộc','Hạnh Nguyện','Như Ý','Bảo Châu','Thanh Lương','Từ Tâm','An Lạc','Giác Hoa','Tuệ Minh','Liên Hương'];
@@ -266,8 +437,9 @@ function donate(v, coins, kind, text){
   if (big){ bell(true); for (let i=0;i<24;i++) floaters.push({ x:SW/2+(Math.random()-.5)*500, y:300+Math.random()*300, vx:(Math.random()-.5)*40, vy:20+Math.random()*40, t:0, life:4, s:.2+Math.random()*.15, down:true }); }
   const label = {petal:'Cánh sen',incense:'Dâng hương',lotus:'Hoa sen',bell:'Thỉnh chuông'}[kind];
   say(v.name, ` đã gửi ${label} ×${coins}` + (text?` · "${text}"`:''), true);
-  showToast(`${v.name} dâng ${label}` + (text?` — ${text}`:''));
+  showToast(`${v.name} dâng ${label} · tiến lên lạy Phật`);
   ttsSpeak(`${v.name} dâng ${label}. ${text||''}`);
+  triggerPray(v, big ? 3 : 3, label);
   renderBoard();
 }
 
@@ -284,13 +456,23 @@ form.addEventListener('submit', e=>{
   audioStart();
   me = addVisitor(name, mySkin, false, true);
   gate.hidden=true; document.getElementById('me').hidden=false; document.getElementById('meName').textContent=name;
-  for (const id of ['mute','leave','gifts','nextTrack']) document.getElementById(id).hidden=false;
+  for (const id of ['mute','leave','gifts','nextTrack','btnScene']) document.getElementById(id).hidden=false;
   say(name,' đã vào chánh điện'); showToast('Hoan nghênh '+name+' vào chánh điện'); ttsSpeak('Hoan nghênh '+name+' vào chánh điện');
 });
 document.getElementById('gifts').addEventListener('click', e=>{ const b=e.target.closest('button'); if(!b||!me) return; donate(me, +b.dataset.coins, b.dataset.fx, SUTRA[Math.floor(Math.random()*SUTRA.length)]); });
+document.getElementById('scene').addEventListener('click', e=>{ const b=e.target.closest('button'); if(!b) return; applyScenePreset(b.dataset.scene); showToast((SCENE_PRESETS[currentScene].icon || '🏯') + ' ' + SCENE_PRESETS[currentScene].label + ' · khung cảnh đang chọn'); });
+document.getElementById('btnScene').addEventListener('click', ()=>{
+  const nextIdx = (SCENE_KEYS.indexOf(currentScene) + 1) % SCENE_KEYS.length;
+  const nextKey = SCENE_KEYS[nextIdx];
+  applyScenePreset(nextKey);
+  showToast((SCENE_PRESETS[nextKey].icon || '🏯') + ' ' + SCENE_PRESETS[nextKey].label + ' · khung cảnh đang chọn');
+});
+let savedScene = 'hall';
+try { savedScene = localStorage.getItem('preferredScene') || 'hall'; } catch(e){}
+applyScenePreset(savedScene);
 document.getElementById('nextTrack').addEventListener('click', ()=>{ if(AC) playTrack(trackIdx+1); });
 document.getElementById('mute').addEventListener('click', e=>{ muted=!muted; if(master) master.gain.value=muted?0:.8; e.currentTarget.textContent=muted?'Bật nhạc':'Tắt nhạc'; e.currentTarget.setAttribute('aria-pressed',muted); });
-document.getElementById('leave').addEventListener('click', ()=>{ removeVisitor(me); me=null; gate.hidden=false; document.getElementById('me').hidden=true; for (const id of ['mute','leave','gifts','nextTrack']) document.getElementById(id).hidden=true; for (const m of musicEls){ try{m.el.pause();}catch(e){} } musicEls=[]; if (AC){ AC.close(); AC=null; } clearInterval(mokTimer); clearInterval(bellTimer); renderBoard(); });
+document.getElementById('leave').addEventListener('click', ()=>{ removeVisitor(me); me=null; gate.hidden=false; document.getElementById('me').hidden=true; for (const id of ['mute','leave','gifts','nextTrack','btnScene']) document.getElementById(id).hidden=true; for (const m of musicEls){ try{m.el.pause();}catch(e){} } musicEls=[]; if (AC){ AC.close(); AC=null; } clearInterval(mokTimer); clearInterval(bellTimer); renderBoard(); });
 canvas.addEventListener('pointerdown', ()=>{ if(!me||me.state!=='sit') return; const s=SUTRA[Math.floor(Math.random()*SUTRA.length)]; say(me.name,' '+s); me.bow=1; floaters.push({x:me.seat.x,y:me.seat.y-80,vx:0,vy:-70,t:0,life:2,s:.14}); });
 // demo activity: random comments and small gifts from the crowd
 setInterval(()=>{ if (visitors.length<2) return; const v=visitors[Math.floor(Math.random()*visitors.length)]; if (v===me) return;
@@ -303,19 +485,191 @@ let last=performance.now();
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 function resize(){ const r=canvas.getBoundingClientRect(); const dpr=Math.min(devicePixelRatio,2); const w=Math.round(r.width*dpr), h=Math.round(r.height*dpr); if(canvas.width!==w||canvas.height!==h){ canvas.width=w; canvas.height=h; } ctx.setTransform(w/SW,0,0,h/SH,0,0); }
 function drawSprite(im, x, y, s, anchorY=1){ if(!im||!im.naturalWidth) return; const w=im.naturalWidth*s, h=im.naturalHeight*s; ctx.drawImage(im, x-w/2, y-h*anchorY, w, h); }
-function nameTag(text, x, y, s, isMe){
+function drawAltarMat(active, t){
+  const mx = PRAY_ALTAR.x, my = PRAY_ALTAR.y, mw = 126, mh = 40;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = active ? (0.5 + 0.18 * Math.sin(t * 3.5)) : 0.22;
+  const g = ctx.createRadialGradient(mx, my, 8, mx, my, 85);
+  g.addColorStop(0, 'rgba(255, 215, 120, .9)');
+  g.addColorStop(0.5, 'rgba(255, 160, 40, .4)');
+  g.addColorStop(1, 'rgba(255, 120, 20, 0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(mx - 100, my - 50, 200, 100);
+  ctx.restore();
+
+  ctx.save();
+  ctx.fillStyle = active ? 'rgba(130, 36, 18, .96)' : 'rgba(90, 24, 12, .92)';
+  ctx.beginPath();
+  ctx.ellipse(mx, my, mw / 2, mh / 2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.lineWidth = active ? 2.5 : 1.8;
+  ctx.strokeStyle = active ? '#ffd98a' : '#e2b04f';
+  ctx.stroke();
+
+  ctx.fillStyle = active ? '#fff0c2' : '#ffd98a';
+  ctx.font = '20px serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('❁', mx, my + 1);
+  ctx.restore();
+}
+function nameTag(text, x, y, s, isMe, isGold){
   ctx.font = `600 ${Math.round(26*s+8)}px "Noto Serif", Georgia, serif`; const w=ctx.measureText(text).width+16, h=30*s+10;
-  ctx.fillStyle = isMe?'rgba(138,42,30,.85)':'rgba(18,10,7,.62)'; roundRect(x-w/2, y-h/2, w, h, h/2); ctx.fill();
-  if (isMe){ ctx.strokeStyle='rgba(217,164,65,.9)'; ctx.lineWidth=2; ctx.stroke(); }
-  ctx.fillStyle='#f1e3c8'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(text, x, y+1);
+  ctx.fillStyle = isGold ? 'rgba(70,30,8,.92)' : isMe ? 'rgba(138,42,30,.85)' : 'rgba(18,10,7,.62)';
+  roundRect(x-w/2, y-h/2, w, h, h/2); ctx.fill();
+  if (isGold || isMe){ ctx.strokeStyle = isGold ? '#ffd98a' : 'rgba(217,164,65,.9)'; ctx.lineWidth = isGold ? 2.5 : 2; ctx.stroke(); }
+  ctx.fillStyle = isGold ? '#ffd98a' : '#f1e3c8'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(text, x, y+1);
 }
 function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function drawSceneBackdrop(t){
+  const preset = SCENE_PRESETS[currentScene] || SCENE_PRESETS.hall;
+  ctx.clearRect(0,0,SW,SH);
+
+  // 1. Draw base hall image with scene color grading filter
+  ctx.save();
+  if (preset.filter && preset.filter !== 'none'){
+    ctx.filter = preset.filter;
+  }
+  if (A.hall && A.hall.naturalWidth){
+    ctx.drawImage(A.hall, 0, 0, SW, SH);
+  } else {
+    const bg = ctx.createLinearGradient(0, 0, 0, SH);
+    bg.addColorStop(0, preset.top);
+    bg.addColorStop(1, preset.bottom);
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, SW, SH);
+  }
+  ctx.restore();
+
+  // 2. Rich atmospheric lighting overlays per scene
+  if (currentScene === 'moon'){
+    // Nightfall deep indigo atmosphere
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    const moonDark = ctx.createLinearGradient(0, 0, 0, SH);
+    moonDark.addColorStop(0, 'rgba(14, 24, 60, 0.72)');
+    moonDark.addColorStop(0.5, 'rgba(20, 32, 75, 0.60)');
+    moonDark.addColorStop(1, 'rgba(10, 18, 48, 0.70)');
+    ctx.fillStyle = moonDark;
+    ctx.fillRect(0, 0, SW, SH);
+    ctx.restore();
+
+    // Silvery moonlight beam streaming through temple skylight
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    const moonBeam = ctx.createRadialGradient(200, 100, 60, 480, 650, 780);
+    moonBeam.addColorStop(0, 'rgba(190, 220, 255, 0.35)');
+    moonBeam.addColorStop(0.45, 'rgba(130, 180, 255, 0.18)');
+    moonBeam.addColorStop(1, 'rgba(100, 150, 255, 0)');
+    ctx.fillStyle = moonBeam;
+    ctx.fillRect(0, 0, SW, SH);
+    ctx.restore();
+  } else if (currentScene === 'sunset'){
+    // Fiery dusk crimson tone
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    const sunsetDark = ctx.createLinearGradient(0, 0, 0, SH);
+    sunsetDark.addColorStop(0, 'rgba(92, 26, 32, 0.52)');
+    sunsetDark.addColorStop(0.5, 'rgba(125, 42, 22, 0.42)');
+    sunsetDark.addColorStop(1, 'rgba(64, 18, 22, 0.52)');
+    ctx.fillStyle = sunsetDark;
+    ctx.fillRect(0, 0, SW, SH);
+    ctx.restore();
+
+    // Warm golden-orange sunset ray
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    const sunsetRay = ctx.createLinearGradient(0, 0, SW, 1200);
+    sunsetRay.addColorStop(0, 'rgba(255, 125, 45, 0.36)');
+    sunsetRay.addColorStop(0.5, 'rgba(255, 75, 25, 0.20)');
+    sunsetRay.addColorStop(1, 'rgba(180, 45, 20, 0)');
+    ctx.fillStyle = sunsetRay;
+    ctx.fillRect(0, 0, SW, SH);
+    ctx.restore();
+  } else if (currentScene === 'bamboo'){
+    // Deep jade forest atmosphere
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    const bambooDark = ctx.createLinearGradient(0, 0, 0, SH);
+    bambooDark.addColorStop(0, 'rgba(14, 46, 26, 0.52)');
+    bambooDark.addColorStop(0.5, 'rgba(18, 56, 32, 0.42)');
+    bambooDark.addColorStop(1, 'rgba(12, 38, 22, 0.52)');
+    ctx.fillStyle = bambooDark;
+    ctx.fillRect(0, 0, SW, SH);
+    ctx.restore();
+
+    // Emerald tranquil light
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    const bambooGlow = ctx.createRadialGradient(SW/2, 400, 60, SW/2, 540, 720);
+    bambooGlow.addColorStop(0, 'rgba(145, 240, 175, 0.28)');
+    bambooGlow.addColorStop(0.55, 'rgba(85, 185, 125, 0.15)');
+    bambooGlow.addColorStop(1, 'rgba(50, 140, 80, 0)');
+    ctx.fillStyle = bambooGlow;
+    ctx.fillRect(0, 0, SW, SH);
+    ctx.restore();
+  } else if (currentScene === 'lotus'){
+    // Lotus twilight rose atmosphere
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    const lotusDark = ctx.createLinearGradient(0, 0, 0, SH);
+    lotusDark.addColorStop(0, 'rgba(56, 18, 40, 0.44)');
+    lotusDark.addColorStop(0.5, 'rgba(78, 24, 48, 0.36)');
+    lotusDark.addColorStop(1, 'rgba(46, 14, 32, 0.46)');
+    ctx.fillStyle = lotusDark;
+    ctx.fillRect(0, 0, SW, SH);
+    ctx.restore();
+
+    // Soft pink lotus aura
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    const lotusGlow = ctx.createRadialGradient(SW/2, 480, 80, SW/2, 600, 700);
+    lotusGlow.addColorStop(0, 'rgba(255, 155, 195, 0.30)');
+    lotusGlow.addColorStop(0.5, 'rgba(235, 115, 165, 0.16)');
+    lotusGlow.addColorStop(1, 'rgba(180, 60, 120, 0)');
+    ctx.fillStyle = lotusGlow;
+    ctx.fillRect(0, 0, SW, SH);
+    ctx.restore();
+  } else if (currentScene === 'dawn'){
+    // Morning golden mist
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    const dawnGlow = ctx.createLinearGradient(0, 0, 0, SH);
+    dawnGlow.addColorStop(0, 'rgba(255, 205, 135, 0.30)');
+    dawnGlow.addColorStop(0.4, 'rgba(255, 225, 180, 0.18)');
+    dawnGlow.addColorStop(1, 'rgba(240, 230, 210, 0.14)');
+    ctx.fillStyle = dawnGlow;
+    ctx.fillRect(0, 0, SW, SH);
+    ctx.restore();
+  } else {
+    // Sân chùa: warm natural hall glow
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    const hallGlow = ctx.createRadialGradient(SW/2, 460, 60, SW/2, 550, 650);
+    hallGlow.addColorStop(0, 'rgba(255, 205, 110, 0.20)');
+    hallGlow.addColorStop(0.6, 'rgba(230, 160, 60, 0.10)');
+    hallGlow.addColorStop(1, 'rgba(200, 120, 40, 0)');
+    ctx.fillStyle = hallGlow;
+    ctx.fillRect(0, 0, SW, SH);
+    ctx.restore();
+  }
+
+  // Soft altar glow behind Buddha
+  const halo = ctx.createRadialGradient(SW/2, 420, 20, SW/2, 420, 420);
+  halo.addColorStop(0, preset.haloColor || 'rgba(255,200,120,.35)');
+  halo.addColorStop(0.45, 'rgba(255,200,120,.14)');
+  halo.addColorStop(1, 'rgba(255,140,60,0)');
+  ctx.save(); ctx.fillStyle = halo; ctx.fillRect(0,0,SW,SH); ctx.restore();
+
+  // Subtle plaque illumination
+  ctx.save(); ctx.globalAlpha = 0.10 + 0.04 * Math.sin(t * 2.1); ctx.fillStyle = '#f5e1bd'; ctx.fillRect(120,150,840,170); ctx.restore();
+}
 function tick(now){
   requestAnimationFrame(tick); resize();
   const dt=Math.min((now-last)/1000,.05); last=now; const t=now/1000;
   // background
-  ctx.clearRect(0,0,SW,SH);
-  if (A.hall.naturalWidth) ctx.drawImage(A.hall,0,0,SW,SH); else { ctx.fillStyle='#1a0d08'; ctx.fillRect(0,0,SW,SH); }
+  drawSceneBackdrop(t);
   // Buddha halo (additive glow over the painted statue, pulses on the bell)
   haloPulse=Math.max(0,haloPulse-dt*.45);
   ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=.22+.08*Math.sin(t*1.2)+haloPulse*.5;
@@ -324,45 +678,200 @@ function tick(now){
   ctx.save(); ctx.globalAlpha=.35; ctx.fillStyle='#e8dcc6';
   for (let i=0;i<14;i++){ const a=((t*.09+i*.071)%1); ctx.globalAlpha=.3*(1-a); ctx.beginPath(); ctx.arc(SW/2+Math.sin(a*7+i)*18*a, 1000-a*260, 4+a*14, 0, 6.28); ctx.fill(); }
   ctx.restore();
-  // candle flicker overlay
-  ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=.06+.04*Math.sin(t*9)*Math.sin(t*13.3); ctx.fillStyle='#ffb347'; ctx.fillRect(0,300,SW,900); ctx.restore();
+  // candle flicker overlay tuned to current scene
+  const curPreset = SCENE_PRESETS[currentScene] || SCENE_PRESETS.hall;
+  ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=.06+.04*Math.sin(t*9)*Math.sin(t*13.3); ctx.fillStyle=curPreset.candleColor||'#ffb347'; ctx.fillRect(0,300,SW,900); ctx.restore();
+
+  // altar prayer mat
+  const isSomeonePraying = visitors.some(v => v.state === 'praying' || v.state === 'pray_kneel');
+  drawAltarMat(isSomeonePraying, t);
+
   // visitors, back to front
   const order=[...visitors].sort((a,b)=>a.y-b.y);
   for (const v of order){
     const anim = hasAnim(v.skin);
+    const isPrayingArea = v.state?.startsWith('pray_');
+    const depth = (v.y - FLOOR.yTop) / (FLOOR.yBot - FLOOR.yTop);
+    const sp = (150 + 170 * Math.max(0, Math.min(1.4, depth))) * dt;
+
     if (v.state==='walk'){
-      if (!anim){ v.x=v.seat.x; v.y=v.seat.y; v.state='sit'; }        // no strip for this skin yet: appear in place
+      if (!anim){ v.x=v.seat.x; v.y=v.seat.y; v.state='sit'; }
       else {
-        // walk up the aisle first, then step sideways into the row; speed in stage px/s scales with depth
-        const depth = (v.y-FLOOR.yTop)/(FLOOR.yBot-FLOOR.yTop), sp = (150+170*Math.max(0,Math.min(1.4,depth)))*dt;
         const dx=v.seat.x-v.x, dy=v.seat.y-v.y;
         if (Math.abs(dy)>3){ v.y += Math.max(-sp, Math.min(sp, dy)); v.x += (SW/2-v.x)*Math.min(1,dt*6); v.flip=false; }
         else { v.x += Math.max(-sp, Math.min(sp, dx)); v.flip = dx<0; }
-        v.ft += dt; if (v.ft > .16){ v.ft = 0; v.frame = (v.frame+1)%4; }      // ~6 fps walk cycle
+        v.ft += dt; if (v.ft > .16){ v.ft = 0; v.frame = (v.frame+1)%4; }
         if (Math.abs(v.x-v.seat.x)<2 && Math.abs(v.y-v.seat.y)<3){ v.x=v.seat.x; v.y=v.seat.y; v.state='sitting'; v.sitT=0; v.flip=false; }
       }
     } else if (v.state==='sitting'){
-      v.sitT += dt; v.frame = 4 + Math.min(3, Math.floor(v.sitT/.22));        // 4 frames ≈ 0.9 s to sit down
+      v.sitT += dt; v.frame = 4 + Math.min(3, Math.floor(v.sitT/.22));
       if (v.sitT > .9){ v.state='sit'; v.frame=7; if (v.isMe) showToast('Đã an tọa. Nam mô A Di Đà Phật.'); }
+    } else if (v.state === 'pray_stand'){
+      v.standT = (v.standT || 0) + dt;
+      v.frame = 7 - Math.min(3, Math.floor(v.standT / 0.12));
+      if (v.standT > 0.45){
+        v.frame = 0;
+        v.state = Math.abs(v.x - SW/2) < 6 ? 'pray_walk_up' : 'pray_walk_out';
+      }
+    } else if (v.state === 'pray_walk_out'){
+      const dx = SW/2 - v.x;
+      v.flip = dx < 0;
+      v.x += Math.max(-sp, Math.min(sp, dx));
+      v.ft += dt; if (v.ft > .14) { v.ft = 0; v.frame = (v.frame + 1) % 4; }
+      if (Math.abs(v.x - SW/2) < 3){
+        v.x = SW/2; v.flip = false;
+        v.state = 'pray_walk_up';
+      }
+    } else if (v.state === 'pray_walk_up'){
+      const dy = PRAY_ALTAR.y - v.y;
+      v.x += (SW/2 - v.x) * Math.min(1, dt * 8);
+      v.flip = false;
+      v.y += Math.max(-sp, Math.min(sp, dy));
+      v.ft += dt; if (v.ft > .14) { v.ft = 0; v.frame = (v.frame + 1) % 4; }
+      if (Math.abs(v.y - PRAY_ALTAR.y) < 3){
+        v.x = PRAY_ALTAR.x; v.y = PRAY_ALTAR.y;
+        v.state = 'pray_kneel';
+        v.sitT = 0;
+      }
+    } else if (v.state === 'pray_kneel'){
+      v.sitT = (v.sitT || 0) + dt;
+      v.frame = 4 + Math.min(3, Math.floor(v.sitT / 0.18));
+      if (v.sitT > 0.72){
+        v.state = 'praying';
+        v.frame = 7;
+        v.prayT = 0;
+        v.bowCount = 0;
+        v.bowBellTriggered = -1;
+        v.glow = 1.2;
+        for (let i = 0; i < 8; i++) floaters.push({
+          x: SW/2 + (Math.random() - 0.5) * 80, y: 1070,
+          vx: (Math.random() - 0.5) * 30, vy: -(50 + Math.random() * 60),
+          t: 0, life: 2.2, s: 0.15 + Math.random() * 0.1
+        });
+      }
+    } else if (v.state === 'praying'){
+      v.frame = 7;
+      v.prayT = (v.prayT || 0) + dt;
+      const BOW_CYCLE = 2.4;
+      const curIndex = Math.floor(v.prayT / BOW_CYCLE);
+      const cycleT = v.prayT % BOW_CYCLE;
+
+      if (cycleT >= 0.9 && v.bowBellTriggered !== curIndex && curIndex < v.maxBows){
+        v.bowBellTriggered = curIndex;
+        v.bowCount = curIndex + 1;
+        bell(curIndex === (v.maxBows - 1));
+        v.glow = 1.0;
+        haloPulse = Math.max(haloPulse, 0.6);
+        for (let i = 0; i < 6; i++) floaters.push({
+          x: SW/2 + (Math.random() - 0.5) * 70, y: 1060,
+          vx: (Math.random() - 0.5) * 35, vy: -(60 + Math.random() * 70),
+          t: 0, life: 2.5, s: 0.16 + Math.random() * 0.12
+        });
+      }
+
+      if (curIndex >= v.maxBows){
+        v.glow = 1.4;
+        v.state = 'pray_stand_up';
+        v.standT = 0;
+        nextPray();
+      }
+    } else if (v.state === 'pray_stand_up'){
+      v.standT = (v.standT || 0) + dt;
+      v.frame = 7 - Math.min(3, Math.floor(v.standT / 0.12));
+      if (v.standT > 0.45){
+        v.frame = 0;
+        v.state = 'pray_walk_down';
+      }
+    } else if (v.state === 'pray_walk_down'){
+      const targetY = v.seat?.y || 1500;
+      const dy = targetY - v.y;
+      v.x += (SW/2 - v.x) * Math.min(1, dt * 8);
+      v.flip = false;
+      v.y += Math.max(-sp, Math.min(sp, dy));
+      v.ft += dt; if (v.ft > .14) { v.ft = 0; v.frame = (v.frame + 1) % 4; }
+      if (Math.abs(v.y - targetY) < 3){
+        v.y = targetY;
+        v.state = Math.abs(v.x - (v.seat?.x || SW/2)) < 6 ? 'sitting' : 'pray_walk_in';
+        v.sitT = 0;
+      }
+    } else if (v.state === 'pray_walk_in'){
+      const targetX = v.seat?.x || SW/2;
+      const dx = targetX - v.x;
+      v.flip = dx < 0;
+      v.x += Math.max(-sp, Math.min(sp, dx));
+      v.ft += dt; if (v.ft > .14) { v.ft = 0; v.frame = (v.frame + 1) % 4; }
+      if (Math.abs(v.x - targetX) < 3){
+        v.x = targetX;
+        v.flip = false;
+        v.state = 'sitting';
+        v.sitT = 0;
+      }
     }
+
     v.fade = Math.min(1, v.fade + dt*2);
-    const sc = v.state==='walk' ? (.22+.33*((v.y-FLOOR.yTop)/(FLOOR.yBot-FLOOR.yTop))) : v.seat.scale;
-    const s = Math.max(.2, Math.min(.75, sc));
+    const sc = (v.state==='walk' || isPrayingArea) ? Math.max(0.28, (.22+.33*((v.y-FLOOR.yTop)/(FLOOR.yBot-FLOOR.yTop)))) : v.seat.scale;
+    const s = Math.max(.22, Math.min(.75, sc));
     v.bow = Math.max(0, v.bow - dt*.7); v.glow = Math.max(0, v.glow - dt*.5);
-    const breathe = (reduce||v.state!=='sit')?0:Math.sin(t*1.1+v.phase)*2*s;
+
+    let bowSquash = 1, bowOffsetY = 0, bowK = 0;
+    if (v.state === 'praying'){
+      const BOW_CYCLE = 2.4;
+      const cycleT = (v.prayT || 0) % BOW_CYCLE;
+      if (cycleT < 0.85){
+        const p = cycleT / 0.85;
+        const e = Math.sin(p * Math.PI / 2);
+        bowSquash = 1 - 0.52 * e;
+        bowOffsetY = 14 * s * e;
+      } else if (cycleT < 1.45){
+        bowSquash = 0.48;
+        bowOffsetY = 14 * s;
+      } else if (cycleT < 2.2){
+        const p = (cycleT - 1.45) / 0.75;
+        const e = Math.sin((1 - p) * Math.PI / 2);
+        bowSquash = 1 - 0.52 * e;
+        bowOffsetY = 14 * s * (1 - p);
+      } else {
+        bowSquash = 1;
+        bowOffsetY = 0;
+      }
+    } else if (v.state === 'sit'){
+      bowK = Math.sin(Math.min(1, v.bow) * Math.PI) * .04;
+    }
+
+    const breathe = (reduce||(v.state!=='sit'&&v.state!=='praying'))?0:Math.sin(t*1.1+v.phase)*2*s;
+    const walkBob = (!anim && (v.state === 'walk' || v.state?.startsWith('pray_walk_'))) ? Math.sin((v.ft || 0) * 16) * 3 * s : 0;
+
     if (v.glow>0){ ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=v.glow*.7; const g=ctx.createRadialGradient(v.x,v.y-90*s,10,v.x,v.y-90*s,170*s); g.addColorStop(0,'rgba(255,200,110,.9)'); g.addColorStop(1,'rgba(255,160,60,0)'); ctx.fillStyle=g; ctx.fillRect(v.x-200*s,v.y-300*s,400*s,340*s); ctx.restore(); }
-    // gentle bow on gift/chant: ease in-out, pivot at the cushion, max ~4% squash
-    const bowK = v.state==='sit' ? Math.sin(Math.min(1,v.bow)*Math.PI)*.04 : 0;
-    ctx.save(); ctx.globalAlpha = v.fade; ctx.translate(v.x, v.y); if (bowK>0) ctx.transform(1,0,0,1-bowK,0,0);
+
+    ctx.save();
+    ctx.globalAlpha = v.fade;
+    ctx.translate(v.x, v.y + bowOffsetY + walkBob);
+    if (v.state === 'praying'){
+      ctx.transform(1, 0, 0, bowSquash, 0, 0);
+    } else if (bowK > 0){
+      ctx.transform(1, 0, 0, 1 - bowK, 0, 0);
+    }
+
     let tagH;
     if (anim){
-      const a = ANIM[v.skin], k = s*1.05*260/a.seatH;                         // same on-screen size as the static seated art
+      const a = ANIM[v.skin], k = s*1.05*260/a.seatH;
       if (v.flip) ctx.scale(-1,1);
       ctx.drawImage(A['anim_'+v.skin], v.frame*a.fw, 0, a.fw, a.fh, -a.fw*k/2, -a.fh*k + breathe, a.fw*k, a.fh*k);
-      tagH = (v.state==='sit' ? a.seatH : a.fh*.97) * k;
+      tagH = ((v.state==='sit' || v.state==='praying' || v.state==='pray_kneel') ? a.seatH : a.fh*.97) * k;
     } else { drawSprite(A[v.skin]||A.man, 0, breathe, s*1.05, 1); tagH = 268*s; }
     ctx.restore();
-    nameTag(v.name, v.x, v.y - tagH - 10*s, s, v.isMe);
+
+    let isGold = isPrayingArea || v.coins >= 99;
+    let displayName = v.name;
+    if (v.state === 'praying'){
+      displayName = `✦ ${v.name} · Lạy Phật (${Math.min(v.maxBows, (v.bowCount || 0) + 1)}/${v.maxBows}) ✦`;
+    } else if (v.state === 'pray_walk_up' || v.state === 'pray_walk_out' || v.state === 'pray_kneel'){
+      displayName = `❁ ${v.name} · Tiến Lễ`;
+    } else if (v.state === 'pray_stand_up' || v.state === 'pray_walk_down' || v.state === 'pray_walk_in'){
+      displayName = `❁ ${v.name} · Tạ Lễ`;
+    }
+
+    nameTag(displayName, v.x, v.y - (tagH * (v.state === 'praying' ? bowSquash : 1)) - 10*s, s, v.isMe, isGold);
   }
   // gift fx
   for (let i=fx.length-1;i>=0;i--){ const f=fx[i]; f.t+=dt; const k=f.t/f.life; if(k>=1){ fx.splice(i,1); continue; }

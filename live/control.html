@@ -59,8 +59,12 @@ button.red{background:var(--red);border-color:#b84a33}
     <label for="uid">Username kênh đang live</label>
     <div class="row"><input id="uid" placeholder="@tenkenhcuaban" autocomplete="off"><button class="primary" id="btnConnect">Kết nối</button><button id="btnDisconnect">Ngắt</button></div>
     <p class="hint">Chỉ đọc sự kiện công khai của phòng live (bình luận, quà, tim). Không cần mật khẩu hay cookie TikTok. Phải bật LIVE trước rồi mới kết nối.</p>
-    <button class="gold" id="btnOverlay">Mở màn hình overlay 9:16</button>
-    <p class="hint">Trong TikTok LIVE Studio: Add source → Window capture → chọn cửa sổ overlay. Bấm "bật âm thanh" một lần trong cửa sổ đó.</p>
+    <div class="row">
+      <button class="gold" id="btnOverlay">Mở màn hình overlay 9:16</button>
+      <button id="btnUnmute">🔊 Bật âm thanh</button>
+      <button id="btnReload" title="Tải lại giao diện overlay trên TikTok LIVE Studio">🔄 Tải lại Live</button>
+    </div>
+    <p class="hint">Nút âm thanh đã được gỡ bỏ hoàn toàn khỏi overlay. Nếu trên TikTok LIVE Studio hình chưa cập nhật, hãy bấm nút <b>"🔄 Tải lại Live"</b> hoặc chuột phải nguồn Liên kết chọn Làm mới.</p>
     <h2>Trong sân chùa</h2>
     <div id="people"><table><tbody id="peopleBody"><tr><td class="hint">Chưa có ai</td><td></td></tr></tbody></table></div>
   </section>
@@ -77,7 +81,7 @@ button.red{background:var(--red);border-color:#b84a33}
       <button data-gift="Đèn hoa sen" data-dia="30">Hoa sen · 30</button>
       <button data-gift="Chuông vàng" data-dia="199">Chuông · 199</button>
     </div>
-    <p class="hint">Gõ <b>nam · nữ · sư · ni · tiểu · bà · cao tăng</b> làm bình luận để đổi hình.</p>
+    <p class="hint">🎁 Tặng quà sẽ kích hoạt Phật tử <b>tiến lên trước bàn thờ lạy Phật</b>.<br>Gõ <b>nam · nữ · sư · ni · tiểu · bà · cao tăng</b> làm bình luận để đổi hình.</p>
     <h2>Đổ người mẫu</h2>
     <div class="row"><button data-fill="15">15</button><button data-fill="36">36</button><button data-fill="64">64</button><button data-fill="100">100</button></div>
     <button class="red" id="btnClear">Làm trống toàn bộ bồ đoàn</button>
@@ -114,6 +118,14 @@ button.red{background:var(--red);border-color:#b84a33}
     <label>Tên thiền đường<input id="title" value="Chánh Điện Tịnh Tâm"></label>
     <label>Dòng phụ<input id="subtitle" value="Nam Mô A Di Đà Phật"></label>
     <div class="row">
+      <label>Khung cảnh<select id="scene">
+        <option value="hall">Sân chùa</option>
+        <option value="dawn">Sớm mai</option>
+        <option value="moon">Trăng đêm</option>
+        <option value="lotus">Sen hương</option>
+        <option value="sunset">Hoàng hôn</option>
+        <option value="bamboo">Rừng trúc</option>
+      </select></label>
       <label>Số chỗ ngồi<select id="seatMode"><option value="auto">Tự mở rộng 24 → 100</option><option value="24">24</option><option value="36">36</option><option value="64">64</option><option value="100">100</option></select></label>
     </div>
     <label class="check"><input type="checkbox" id="joinOnEnter"> Người vào phòng cũng được ngồi (không cần bình luận)</label>
@@ -131,7 +143,7 @@ const $ = id => document.getElementById(id);
 let ws = null;
 const send = (cmd, extra={}) => ws?.readyState===1 && ws.send(JSON.stringify({ t:'ctl', cmd, ...extra }));
 function logLine(s){ const el=$('log'); el.textContent += s + '\n'; el.scrollTop = el.scrollHeight; }
-const SETTING_IDS = ['voice','pitch','rate','music','mo','autoChant','moBpm','chantEveryMin','title','subtitle','seatMode','joinOnEnter'];
+const SETTING_IDS = ['voice','pitch','rate','music','mo','autoChant','moBpm','chantEveryMin','scene','title','subtitle','seatMode','joinOnEnter'];
 function fillSettings(s){ for (const k of SETTING_IDS){ const el=$(k); if (!el || s[k]===undefined) continue; if (el.type==='checkbox') el.checked=!!s[k]; else el.value=s[k]; } }
 function readSettings(){ const o={}; for (const k of SETTING_IDS){ const el=$(k); o[k] = el.type==='checkbox' ? el.checked : el.type==='number' ? +el.value : el.value; } return o; }
 const people = new Map();
@@ -168,6 +180,8 @@ $('btnConnect').onclick = () => send('connect', { uniqueId: $('uid').value });
 $('uid').onkeydown = e => { if (e.key==='Enter') send('connect', { uniqueId: $('uid').value }); };
 $('btnDisconnect').onclick = () => send('disconnect');
 $('btnOverlay').onclick = () => window.open('/live/overlay.html', 'overlay916', 'width=540,height=960');
+$('btnUnmute').onclick = () => send('unmute');
+$('btnReload').onclick = () => send('reload');
 $('btnChat').onclick = () => send('chat', { name: $('simName').value, text: $('simText').value });
 document.querySelectorAll('[data-gift]').forEach(b => b.onclick = () => send('gift', { name: $('simName').value, gift: b.dataset.gift, diamonds: +b.dataset.dia, count: 1 }));
 document.querySelectorAll('[data-fill]').forEach(b => b.onclick = () => send('fill', { n: +b.dataset.fill }));

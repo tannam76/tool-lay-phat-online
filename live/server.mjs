@@ -28,6 +28,7 @@ const settings = {
   rate: -20,                         // %
   music: true, mo: true, moBpm: 52,
   autoChant: true, chantEveryMin: 3,
+  scene: 'hall',                     // hall | dawn | moon | lotus | sunset | bamboo
   seatMode: 'auto',                  // auto | 24 | 36 | 64 | 100
   joinOnEnter: false,                // also seat viewers who only enter the room
   gifts: { readAll: true, minDiamonds: 1 },
@@ -60,14 +61,21 @@ function pub(v){ return { id:v.id, name:v.name, skin:v.skin, avatar:v.avatar||''
 function snapshot(){ return { t:'state', settings, viewers:[...viewers.values()].map(pub), cap: capacity(), startedAt, tiktok: tiktokState }; }
 
 function seat(id, name, opts = {}){
+  id = String(id || name || 'user_' + Math.random().toString(36).slice(2, 7)).trim();
   let v = viewers.get(id);
-  if (v){ v.lastAt = Date.now(); if (opts.avatar) v.avatar = opts.avatar; return { v, isNew:false }; }
+  if (v){
+    v.lastAt = Date.now();
+    if (name) v.name = String(name).slice(0, 18);
+    if (opts.avatar) v.avatar = opts.avatar;
+    return { v, isNew:false };
+  }
   if (viewers.size >= 100){                     // full: the longest-quiet non-donor stands up
-    const quiet = [...viewers.values()].filter(x => x.coins === 0).sort((a,b) => a.lastAt - b.lastAt)[0];
+    const quiet = [...viewers.values()].filter(x => x.coins === 0).sort((a,b) => a.lastAt - b.lastAt)[0]
+               || [...viewers.values()].sort((a,b) => a.coins - b.coins || a.lastAt - b.lastAt)[0];
     if (!quiet) return { v:null, isNew:false };
     viewers.delete(quiet.id); broadcast({ t:'leave', id: quiet.id });
   }
-  v = { id, name: (name||id).slice(0, 18), skin: opts.skin || DEFAULT_SKINS[viewers.size % DEFAULT_SKINS.length],
+  v = { id, name: String(name || id).slice(0, 18), skin: opts.skin || DEFAULT_SKINS[viewers.size % DEFAULT_SKINS.length],
         avatar: opts.avatar || '', coins: 0, joinedAt: Date.now(), lastAt: Date.now(), demo: !!opts.demo };
   viewers.set(id, v);
   broadcast({ t:'join', v: pub(v), cap: capacity() });
@@ -76,17 +84,22 @@ function seat(id, name, opts = {}){
 
 /* ------------------------------------------------------------- events in */
 function onChat(id, name, text, avatar){
+  id = String(id || name || 'user_' + Math.random().toString(36).slice(2, 7)).trim();
+  name = String(name || id).slice(0, 18);
   text = String(text || '').slice(0, 120);
   const want = skinFromText(text);
   const { v, isNew } = seat(id, name, { avatar, skin: want || undefined });
   if (!v) return;
-  if (!isNew && want && want !== v.skin){ v.skin = want; broadcast({ t:'skin', id, skin: want }); }
+  if (!isNew && want && want !== v.skin){ v.skin = want; broadcast({ t:'skin', id: v.id, skin: want }); }
   v.lastText = text; v.lastTextAt = Date.now();
-  broadcast({ t:'chat', id, name: v.name, text });
+  broadcast({ t:'chat', id: v.id, name: v.name, text });
 }
 
 function onGift(id, name, giftName, count, diamonds, avatar){
-  giftName = String(giftName || 'quà').slice(0, 30); count = Math.max(1, Math.min(9999, +count || 1));
+  id = String(id || name || 'user_' + Math.random().toString(36).slice(2, 7)).trim();
+  name = String(name || id).slice(0, 18);
+  giftName = String(giftName || 'quà').slice(0, 30);
+  count = Math.max(1, Math.min(9999, +count || 1));
   const { v } = seat(id, name, { avatar });
   if (!v) return;
   const coins = Math.max(1, (diamonds || 1) * (count || 1));
@@ -94,8 +107,8 @@ function onGift(id, name, giftName, count, diamonds, avatar){
   const prayer = (v.lastText && Date.now() - v.lastTextAt < 90_000 && v.lastText.length > 6) ? v.lastText : pickPrayer();
   const tier = coins >= 99 ? 3 : coins >= 10 ? 2 : 1;
   const line = `Nam mô A Di Đà Phật. Phật tử ${spoken(v.name)} thành tâm dâng ${giftName}${count > 1 ? ', ' + count + ' lần' : ''}. ${prayer}.`;
-  broadcast({ t:'gift', id, name: v.name, giftName, count, coins, total: v.coins, tier, prayer });
-  if (settings.gifts.readAll || coins >= settings.gifts.minDiamonds) say(line, { tag:'gift', id });
+  broadcast({ t:'gift', id: v.id, name: v.name, giftName, count, coins, total: v.coins, tier, prayer });
+  if (settings.gifts.readAll || coins >= settings.gifts.minDiamonds) say(line, { tag:'gift', id: v.id });
 }
 
 function pickPrayer(){
@@ -109,18 +122,60 @@ const spoken = s => String(s).replace(/[_@.]+/g, ' ').replace(/[^\p{L}\p{N}\s]/g
 const ttsQueue = []; let ttsBusy = false, ttsSeq = 0;
 function esc(s){ return String(s).replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;'}[c])); }
 function say(text, meta = {}){ if (ttsQueue.length >= 15) { addLog('Hàng đợi giọng đọc đầy, bỏ qua 1 câu'); return; } ttsQueue.push({ text: String(text).slice(0, 500), meta }); pumpTTS(); }
+
+async function synthesizeAudio(text, options, maxRetries = 3) {
+  let lastErr = null;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    let tts = null;
+    try {
+      tts = new MsEdgeTTS();
+      await tts.setMetadata(settings.voice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
+      const { audioStream } = tts.toStream(esc(text), options);
+      const chunks = [];
+      await new Promise((resolve, reject) => {
+        let settled = false;
+        const done = () => { if (!settled) { settled = true; resolve(); } };
+        audioStream.on('data', c => chunks.push(c));
+        audioStream.once('end', done);
+        audioStream.once('close', done);
+        audioStream.once('error', err => {
+          if (!settled) {
+            settled = true;
+            // Nếu đã nhận đủ dữ liệu âm thanh (> 4KB) ở lần cuối cùng nhưng bị đóng bất ngờ, vẫn giữ được âm thanh
+            if (chunks.length > 0 && Buffer.concat(chunks).length > 4096 && attempt === maxRetries) {
+              resolve();
+            } else {
+              reject(err);
+            }
+          }
+        });
+      });
+      try { tts.close(); } catch {}
+      const buf = Buffer.concat(chunks);
+      if (buf.length > 0) return buf;
+      throw new Error('Không nhận được dữ liệu âm thanh');
+    } catch (e) {
+      lastErr = e;
+      try { tts?.close(); } catch {}
+      if (attempt < maxRetries) {
+        await new Promise(r => setTimeout(r, 250 * attempt));
+      }
+    }
+  }
+  throw lastErr;
+}
+
 async function pumpTTS(){
   if (ttsBusy || !ttsQueue.length) return; ttsBusy = true;
   const { text, meta } = ttsQueue.shift();
   try {
     const file = `tts_${Date.now()}_${++ttsSeq}.mp3`;
-    const tts = new MsEdgeTTS();
-    await tts.setMetadata(settings.voice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
-    const { audioStream } = tts.toStream(esc(text), { pitch: `${settings.pitch >= 0 ? '+' : ''}${settings.pitch}Hz`, rate: `${settings.rate >= 0 ? '+' : ''}${settings.rate}%` });
-    const chunks = [];
-    await new Promise((res, rej) => { audioStream.on('data', c => chunks.push(c)); audioStream.on('close', res); audioStream.on('error', rej); });
-    try { tts.close(); } catch {}
-    fs.writeFileSync(path.join(TTS_DIR, file), Buffer.concat(chunks));
+    const options = {
+      pitch: `${settings.pitch >= 0 ? '+' : ''}${settings.pitch}Hz`,
+      rate: `${settings.rate >= 0 ? '+' : ''}${settings.rate}%`
+    };
+    const audioBuf = await synthesizeAudio(text, options, 3);
+    fs.writeFileSync(path.join(TTS_DIR, file), audioBuf);
     broadcast({ t:'tts', url: `/live/tts/${file}`, text, ...meta });
     const old = fs.readdirSync(TTS_DIR).sort(); while (old.length > 40) { try { fs.unlinkSync(path.join(TTS_DIR, old.shift())); } catch {} }
   } catch (e) { addLog('TTS lỗi: ' + (e?.message || e)); }
@@ -140,28 +195,32 @@ scheduleChant();
 
 /* --------------------------------------------------------------- TikTok */
 let TikTokLib = null;
+let isConnectingTikTok = false;
 async function connectTikTok(uniqueId){
   uniqueId = String(uniqueId || '').trim().replace(/^.*tiktok\.com\/@?/i, '').replace(/^@/, '').replace(/\/.*$/, '');
   if (!uniqueId) return;
+  if (isConnectingTikTok) return;
+  isConnectingTikTok = true;
   await disconnectTikTok();
   tiktokState = { status: 'connecting', uniqueId, error: '' }; broadcast({ t:'tiktok', ...tiktokState });
   try {
     TikTokLib ||= await import('tiktok-live-connector');
     const { TikTokLiveConnection, WebcastEvent, ControlEvent } = TikTokLib;
-    const conn = new TikTokLiveConnection(uniqueId, { enableExtendedGiftInfo: true, processInitialData: false });
-    const av = u => u?.profilePicture?.url?.[0] || u?.profilePicture?.urlList?.[0] || u?.avatarThumb?.urlList?.[0] || u?.avatarThumb?.url?.[0] || '';
-    const nm = u => u?.nickname || u?.uniqueId || 'ẩn danh';
-    conn.on(WebcastEvent.CHAT, d => onChat(d.user?.uniqueId || d.user?.userId, nm(d.user), d.comment, av(d.user)));
+    const conn = new TikTokLiveConnection(uniqueId, { enableExtendedGiftInfo: false, processInitialData: false });
+    const av = u => u?.profilePictureUrl || u?.profilePicture?.url?.[0] || u?.profilePicture?.urlList?.[0] || u?.avatarThumb?.urlList?.[0] || u?.avatarThumb?.url?.[0] || u?.avatarMedium?.urlList?.[0] || u?.avatarLarge?.urlList?.[0] || '';
+    const nm = u => u?.nickname || u?.displayId || u?.uniqueId || 'ẩn danh';
+    const uid = u => u?.displayId || u?.uniqueId || u?.idStr || (u?.id ? String(u.id) : '') || u?.secUid || u?.nickname;
+    conn.on(WebcastEvent.CHAT, d => onChat(uid(d.user), nm(d.user), d.comment, av(d.user)));
     conn.on(WebcastEvent.GIFT, d => {
-      const type = d.giftDetails?.giftType ?? d.extendedGiftInfo?.type;
+      const type = d.gift?.type ?? d.giftDetails?.giftType ?? d.extendedGiftInfo?.type;
       if (type === 1 && !d.repeatEnd) return;                       // streak still running
-      const gname = d.giftDetails?.giftName || d.extendedGiftInfo?.name || 'quà';
-      const dia = d.giftDetails?.diamondCount ?? d.extendedGiftInfo?.diamond_count ?? 1;
-      onGift(d.user?.uniqueId || d.user?.userId, nm(d.user), gname, d.repeatCount || 1, dia, av(d.user));
+      const gname = d.gift?.describe || d.giftDetails?.giftName || d.extendedGiftInfo?.name || 'quà';
+      const dia = d.gift?.diamondCount ?? d.giftDetails?.diamondCount ?? d.extendedGiftInfo?.diamond_count ?? 1;
+      onGift(uid(d.user), nm(d.user), gname, d.repeatCount || 1, dia, av(d.user));
       addLog(`🎁 ${nm(d.user)} tặng ${gname} x${d.repeatCount || 1}`);
     });
-    conn.on(WebcastEvent.MEMBER, d => { if (settings.joinOnEnter) seat(d.user?.uniqueId, nm(d.user), { avatar: av(d.user) }); });
-    conn.on(WebcastEvent.LIKE, d => broadcast({ t:'like', id: d.user?.uniqueId, n: d.likeCount || 1 }));
+    conn.on(WebcastEvent.MEMBER, d => { if (settings.joinOnEnter) seat(uid(d.user), nm(d.user), { avatar: av(d.user) }); });
+    conn.on(WebcastEvent.LIKE, d => broadcast({ t:'like', id: uid(d.user), n: d.likeCount || 1 }));
     conn.on(ControlEvent.DISCONNECTED, () => { tiktokState = { ...tiktokState, status: 'disconnected' }; broadcast({ t:'tiktok', ...tiktokState }); addLog('TikTok: mất kết nối'); });
     conn.on(ControlEvent.ERROR, e => addLog('TikTok lỗi: ' + (e?.info || e?.message || e)));
     const st = await conn.connect();
@@ -171,6 +230,8 @@ async function connectTikTok(uniqueId){
   } catch (e) {
     tiktokState = { status: 'error', uniqueId, error: String(e?.message || e) };
     addLog(`❌ Không kết nối được @${uniqueId}: ${tiktokState.error}`);
+  } finally {
+    isConnectingTikTok = false;
   }
   broadcast({ t:'tiktok', ...tiktokState });
 }
@@ -198,6 +259,8 @@ function onControl(m){
     case 'clear': clearSeats(); break;
     case 'bell': broadcast({ t:'bell' }); break;
     case 'mo': broadcast({ t:'mo1' }); break;
+    case 'unmute': broadcast({ t:'unmute' }); break;
+    case 'reload': broadcast({ t:'reload' }); break;
     case 'chant': chant(); break;
     case 'say': if (m.text) say(String(m.text).slice(0, 400), { tag:'say' }); break;
     case 'settings':
@@ -213,6 +276,7 @@ const SETTING_RULES = {
   voice: v => ['vi-VN-NamMinhNeural', 'vi-VN-HoaiMyNeural'].includes(v) ? v : settings.voice,
   pitch: v => clamp(v, -50, 50), rate: v => clamp(v, -50, 50), moBpm: v => clamp(v, 20, 120), chantEveryMin: v => clamp(v, 1, 60),
   music: Boolean, mo: Boolean, autoChant: Boolean, joinOnEnter: Boolean,
+  scene: v => ['hall', 'dawn', 'moon', 'lotus', 'sunset', 'bamboo'].includes(String(v)) ? String(v) : 'hall',
   seatMode: v => ['auto', '24', '36', '64', '100'].includes(String(v)) ? String(v) : 'auto',
 };
 const clamp = (v, a, b) => Math.max(a, Math.min(b, Math.round(+v || 0)));

@@ -56,8 +56,6 @@ html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:var(-
 #gift .who{font-family:var(--display);font-weight:700;font-size:52px;color:var(--gold2)}
 #gift .what{font-size:36px;margin-top:6px}
 #gift .pray{font-family:var(--display);font-style:italic;font-size:32px;color:var(--fg);margin-top:12px;opacity:.95}
-/* enable sound (needed once: browsers block autoplay) */
-#unmute{position:absolute;z-index:9;left:50%;top:1540px;transform:translateX(-50%);font:600 36px var(--body);padding:22px 44px;border-radius:24px;border:3px solid var(--gold2);background:var(--red);color:#fff4dc;cursor:pointer}
 #conn{position:absolute;z-index:4;right:16px;bottom:12px;font-size:20px;color:var(--muted);opacity:.6}
 @media (prefers-reduced-motion:reduce){#chant,#gift{transition:none}}
 </style>
@@ -73,12 +71,11 @@ html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:var(-
   <div id="guide" class="card ui">
     <div>💬 <b>Bình luận bất kỳ</b> để vào thiền</div>
     <div>Gõ <b>nam · nữ · sư · ni · tiểu · bà · cao tăng</b> để đổi hình</div>
-    <div>🎁 Tặng quà được <b>xướng tên hồi hướng</b></div>
+    <div>🎁 Tặng quà được <b>tiến lên lạy Phật</b> & xướng tên</div>
   </div>
   <div id="merit" class="card ui"><h3>✦ Công Đức ✦</h3><ol id="meritList"><li class="empty">Chưa có</li></ol></div>
-  <div id="chant" class="ui"><h4>✦ TỤNG KINH ĐỊNH KỲ ✦</h4><p id="chantText"></p></div>
+  <div id="chant" class="ui"><h4>✦ TỤNG KINH ✦</h4><p id="chantText"></p></div>
   <div id="gift" class="ui"><div class="who" id="giftWho"></div><div class="what" id="giftWhat"></div><div class="pray" id="giftPray"></div></div>
-  <button id="unmute">🔔 Bấm để bật âm thanh</button>
   <div id="conn">đang kết nối…</div>
 </div></div>
 
@@ -129,8 +126,63 @@ function reseat(){
 }
 document.getElementById('count').textContent = '0/24';
 
-/* the three fixed teachers in front of the altar */
-const TEACHERS = [ { name:'Thầy Minh Đạo', skin:'monk', x:300, y:1085, s:.36 }, { name:'Sư Trụ Trì', skin:'monk', x:540, y:1100, s:.4, master:true }, { name:'Thầy Tâm Từ', skin:'monk', x:780, y:1085, s:.36 } ];
+/* the three fixed teachers flanking the altar, leaving the center aisle open for bowing */
+const TEACHERS = [
+  { name:'Thầy Minh Đạo', skin:'monk', x:260, y:1085, s:.36 },
+  { name:'Sư Trụ Trì', skin:'monk', x:385, y:1095, s:.4, master:true },
+  { name:'Thầy Tâm Từ', skin:'monk', x:740, y:1090, s:.37 }
+];
+
+/* prayer queue & altar prayer mat */
+const PRAY_ALTAR = { x: 540, y: 1165 };
+const prayQueue = [];
+let currentPrayId = null;
+
+function triggerPray(v, tier, giftName){
+  if (!v) return;
+  const maxBows = tier >= 3 ? 3 : tier >= 2 ? 3 : 3;
+  if (currentPrayId === v.id || prayQueue.some(item => item.id === v.id)){
+    if (v.state === 'praying') v.maxBows = Math.min(5, (v.maxBows || 3) + 1);
+    return;
+  }
+  if (!currentPrayId){
+    startPray(v, maxBows, giftName);
+  } else {
+    prayQueue.push({ id: v.id, maxBows, giftName });
+  }
+}
+
+function startPray(v, maxBows, giftName){
+  currentPrayId = v.id;
+  v.maxBows = maxBows || 3;
+  v.prayGift = giftName || 'quà';
+  v.bowCount = 0;
+  v.bowBellTriggered = -1;
+  v.prayT = 0;
+  v.standT = 0;
+  v.glow = 1.3;
+  if (v.state === 'sit'){
+    v.state = 'pray_stand';
+    v.standT = 0;
+  } else if (v.state === 'walk'){
+    v.state = 'pray_walk_up';
+  } else {
+    v.state = 'pray_walk_out';
+  }
+}
+
+function nextPray(){
+  currentPrayId = null;
+  if (!prayQueue.length) return;
+  const item = prayQueue.shift();
+  const v = visitors.get(item.id);
+  if (v){
+    const bows = prayQueue.length >= 2 ? 2 : item.maxBows;
+    startPray(v, bows, item.giftName);
+  } else {
+    nextPray();
+  }
+}
 
 function addVisitor(p, instant){
   if (visitors.has(p.id)) { Object.assign(visitors.get(p.id), { name:p.name, skin:p.skin, avatar:p.avatar, coins:p.coins }); return; }
@@ -138,7 +190,15 @@ function addVisitor(p, instant){
   visitors.set(p.id, v); order.push(p.id); reseat();
   if (instant || !hasAnim(v.skin) || !v.seat){ v.state='sit'; v.frame=7; v.x=v.tx=v.seat?.x||540; v.y=v.ty=v.seat?.y||1500; v.fade = instant?1:0; }
 }
-function removeVisitor(id){ visitors.delete(id); reseat(); }
+function removeVisitor(id){
+  visitors.delete(id);
+  reseat();
+  if (currentPrayId === id) { nextPray(); }
+  else {
+    const idx = prayQueue.findIndex(item => item.id === id);
+    if (idx >= 0) prayQueue.splice(idx, 1);
+  }
+}
 
 /* ======================= HUD ======================= */
 let startedAt = Date.now();
@@ -153,7 +213,7 @@ setInterval(()=>{ const s=Math.floor((Date.now()-startedAt)/1000); document.getE
 let giftHide=null;
 function showGift(m){
   document.getElementById('giftWho').textContent = m.name;
-  document.getElementById('giftWhat').textContent = `thành tâm dâng ${m.giftName}${m.count>1?' ×'+m.count:''} · công đức ${m.total}`;
+  document.getElementById('giftWhat').textContent = `thành tâm dâng ${m.giftName}${m.count>1?' ×'+m.count:''} · tiến lên lạy Phật`;
   document.getElementById('giftPray').textContent = '“' + m.prayer + '”';
   document.getElementById('chant').classList.remove('show');
   const el=document.getElementById('gift'); el.classList.add('show'); clearTimeout(giftHide); giftHide=setTimeout(()=>el.classList.remove('show'), m.tier>=3?9000:6500);
@@ -162,16 +222,28 @@ let chantHide=null;
 function showChant(text){ document.getElementById('chantText').textContent=text; const el=document.getElementById('chant'); el.classList.add('show'); clearTimeout(chantHide); chantHide=setTimeout(()=>el.classList.remove('show'), 14000); }
 
 /* ======================= audio ======================= */
-let AC=null, master=null, musicGain=null, sfx=null, settings={ music:true, mo:true, moBpm:52 };
+let AC=null, master=null, musicGain=null, sfx=null, settings={ music:true, mo:true, moBpm:52, scene:'hall' };
 const TRACKS=['/assets/music/music1.mp3','/assets/music/music2.mp3']; let trackIdx=Math.floor(Math.random()*TRACKS.length), musicEl=null;
-document.getElementById('unmute').onclick = e => { e.currentTarget.remove(); startAudio(); };
 function startAudio(){
-  AC = new (window.AudioContext||window.webkitAudioContext)();
-  master = AC.createGain(); master.gain.value=.9; master.connect(AC.destination);
-  musicGain = AC.createGain(); musicGain.gain.value=settings.music?.5:0; musicGain.connect(master);
-  sfx = AC.createGain(); sfx.gain.value=1; sfx.connect(master);
-  nextTrack(); scheduleMo(); bell();
+  if (AC){
+    if (AC.state === 'suspended') AC.resume();
+    return;
+  }
+  try {
+    AC = new (window.AudioContext||window.webkitAudioContext)();
+    master = AC.createGain(); master.gain.value=.9; master.connect(AC.destination);
+    musicGain = AC.createGain(); musicGain.gain.value=settings.music?.5:0; musicGain.connect(master);
+    sfx = AC.createGain(); sfx.gain.value=1; sfx.connect(master);
+    nextTrack(); scheduleMo(); bell();
+  } catch(e){}
 }
+
+// Chạm / bấm bất kỳ đâu trên màn hình overlay cũng kích hoạt âm thanh
+window.addEventListener('pointerdown', startAudio);
+window.addEventListener('keydown', startAudio);
+
+// Tự phát âm thanh khi tải trang
+try { startAudio(); } catch(e){}
 function nextTrack(){
   if (musicEl){ musicEl.pause(); }
   musicEl = new Audio(TRACKS[trackIdx++ % TRACKS.length]); const src=AC.createMediaElementSource(musicEl); src.connect(musicGain);
@@ -229,19 +301,269 @@ function connect(){
       case 'join': if (m.cap!==cap) layout(m.cap); addVisitor(m.v, m.v.demo && visitors.size>8); updateCount(); break;
       case 'leave': removeVisitor(m.id); updateCount(); renderMerit(); break;
       case 'skin': { const v=visitors.get(m.id); if(v){ v.skin=m.skin; v.glow=.8; if(v.state!=='sit'){ v.state='sit'; v.frame=7; } } } break;
-      case 'chat': { const v=visitors.get(m.id); if(v){ v.bubble={text:m.text, until:performance.now()+6000}; v.bow=.6; } } break;
-      case 'gift': { const v=visitors.get(m.id); if(v){ v.coins=m.total; giftFx(v,m.tier); } renderMerit(); showGift(m); } break;
+      case 'chat': {
+        let v = visitors.get(m.id);
+        if (!v) { addVisitor({ id: m.id, name: m.name, skin: 'man', avatar: '', coins: 0 }, false); v = visitors.get(m.id); }
+        if (v){ v.bubble={text:m.text, until:performance.now()+6000}; v.bow=.6; }
+        break;
+      }
+      case 'gift': {
+        let v = visitors.get(m.id);
+        if (!v) { addVisitor({ id: m.id, name: m.name, skin: 'man', avatar: '', coins: m.total }, false); v = visitors.get(m.id); }
+        else { v.coins = m.total; }
+        if (v) {
+          giftFx(v, m.tier);
+          triggerPray(v, m.tier, m.giftName);
+        }
+        renderMerit(); showGift(m);
+        break;
+      }
       case 'like': { const v=visitors.get(m.id); if(v) hearts(v,m.n); } break;
       case 'tts': queueTTS(m.url); break;
       case 'chant': showChant(m.text); bell(); break;
       case 'bell': bell(true); break;
       case 'mo1': mo(); break;
+      case 'unmute': startAudio(); break;
+      case 'reload': location.reload(); break;
     }
   };
+}
+const SCENE_PRESETS = {
+  hall: {
+    label: 'Sân chùa',
+    icon: '🏯',
+    top: '#120a06',
+    bottom: '#2f180d',
+    panel: 'rgba(28,13,7,.78)',
+    line: 'rgba(226,176,79,.55)',
+    gold: '#e2b04f',
+    gold2: '#ffd98a',
+    filter: 'none',
+    haloColor: 'rgba(255,200,100,.35)',
+    candleColor: '#ffb347',
+  },
+  dawn: {
+    label: 'Sớm mai',
+    icon: '🌅',
+    top: '#181216',
+    bottom: '#3a201c',
+    panel: 'rgba(33,17,13,.78)',
+    line: 'rgba(255,189,120,.6)',
+    gold: '#f3b968',
+    gold2: '#ffe4a6',
+    filter: 'brightness(1.03) contrast(1.04) saturate(1.15) hue-rotate(-6deg)',
+    haloColor: 'rgba(255,215,130,.40)',
+    candleColor: '#ffd480',
+  },
+  moon: {
+    label: 'Trăng đêm',
+    icon: '🌙',
+    top: '#090d1a',
+    bottom: '#14182c',
+    panel: 'rgba(14,18,32,.8)',
+    line: 'rgba(165,190,255,.65)',
+    gold: '#a6bcff',
+    gold2: '#e3ebff',
+    filter: 'brightness(0.60) contrast(1.22) saturate(1.3) hue-rotate(188deg)',
+    haloColor: 'rgba(160,205,255,.50)',
+    candleColor: '#ffd89a',
+  },
+  lotus: {
+    label: 'Sen hương',
+    icon: '🪷',
+    top: '#160b13',
+    bottom: '#2e1423',
+    panel: 'rgba(36,16,12,.8)',
+    line: 'rgba(246,176,130,.6)',
+    gold: '#efb382',
+    gold2: '#ffe4c4',
+    filter: 'brightness(0.88) contrast(1.10) saturate(1.28) hue-rotate(320deg)',
+    haloColor: 'rgba(255,175,205,.42)',
+    candleColor: '#ffaec9',
+  },
+  sunset: {
+    label: 'Hoàng hôn',
+    icon: '🌇',
+    top: '#1a0b0d',
+    bottom: '#451a14',
+    panel: 'rgba(41,16,12,.8)',
+    line: 'rgba(255,141,102,.6)',
+    gold: '#ffb17a',
+    gold2: '#ffe2ba',
+    filter: 'brightness(0.86) contrast(1.18) saturate(1.45) sepia(0.2) hue-rotate(-18deg)',
+    haloColor: 'rgba(255,155,60,.45)',
+    candleColor: '#ff7733',
+  },
+  bamboo: {
+    label: 'Rừng trúc',
+    icon: '🎋',
+    top: '#06160d',
+    bottom: '#133522',
+    panel: 'rgba(13,28,15,.8)',
+    line: 'rgba(156,219,165,.62)',
+    gold: '#9de0a8',
+    gold2: '#ebffe8',
+    filter: 'brightness(0.82) contrast(1.12) saturate(1.26) hue-rotate(82deg)',
+    haloColor: 'rgba(155,245,185,.40)',
+    candleColor: '#ffe599',
+  },
+};
+let currentScene = 'hall';
+function applySceneTheme(sceneName){
+  const key = SCENE_PRESETS[sceneName] ? sceneName : 'hall';
+  currentScene = key;
+  const scene = SCENE_PRESETS[key];
+  const root = document.documentElement.style;
+  root.setProperty('--bg', scene.top);
+  root.setProperty('--panel', scene.panel);
+  root.setProperty('--line', scene.line);
+  root.setProperty('--gold', scene.gold);
+  root.setProperty('--gold2', scene.gold2);
+  const stageEl = document.getElementById('stage');
+  if (stageEl) stageEl.style.background = scene.top;
+  const plaque = document.getElementById('plaque');
+  if (plaque) plaque.style.background = `linear-gradient(180deg,rgba(70,26,10,.92),rgba(30,12,6,.92))`;
+  const guide = document.getElementById('guide');
+  if (guide) guide.style.background = scene.panel;
+  const merit = document.getElementById('merit');
+  if (merit) merit.style.background = scene.panel;
+  const chant = document.getElementById('chant');
+  if (chant) chant.style.background = scene.panel;
+}
+function drawSceneBackdrop(t){
+  const preset = SCENE_PRESETS[currentScene] || SCENE_PRESETS.hall;
+  ctx.clearRect(0,0,1080,1920);
+
+  // 1. Base hall with color grading filter
+  ctx.save();
+  if (preset.filter && preset.filter !== 'none'){
+    ctx.filter = preset.filter;
+  }
+  if (A.hall && A.hall.naturalWidth){
+    ctx.drawImage(A.hall, 0, 0, 1080, 1920);
+  } else {
+    const bg = ctx.createLinearGradient(0, 0, 0, 1920);
+    bg.addColorStop(0, preset.top);
+    bg.addColorStop(1, preset.bottom);
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, 1080, 1920);
+  }
+  ctx.restore();
+
+  // 2. Atmospheric lighting overlays
+  if (currentScene === 'moon'){
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    const moonDark = ctx.createLinearGradient(0, 0, 0, 1920);
+    moonDark.addColorStop(0, 'rgba(14, 24, 60, 0.72)');
+    moonDark.addColorStop(0.5, 'rgba(20, 32, 75, 0.60)');
+    moonDark.addColorStop(1, 'rgba(10, 18, 48, 0.70)');
+    ctx.fillStyle = moonDark;
+    ctx.fillRect(0, 0, 1080, 1920);
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    const moonBeam = ctx.createRadialGradient(200, 100, 60, 480, 650, 780);
+    moonBeam.addColorStop(0, 'rgba(190, 220, 255, 0.35)');
+    moonBeam.addColorStop(0.45, 'rgba(130, 180, 255, 0.18)');
+    moonBeam.addColorStop(1, 'rgba(100, 150, 255, 0)');
+    ctx.fillStyle = moonBeam;
+    ctx.fillRect(0, 0, 1080, 1920);
+    ctx.restore();
+  } else if (currentScene === 'sunset'){
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    const sunsetDark = ctx.createLinearGradient(0, 0, 0, 1920);
+    sunsetDark.addColorStop(0, 'rgba(92, 26, 32, 0.52)');
+    sunsetDark.addColorStop(0.5, 'rgba(125, 42, 22, 0.42)');
+    sunsetDark.addColorStop(1, 'rgba(64, 18, 22, 0.52)');
+    ctx.fillStyle = sunsetDark;
+    ctx.fillRect(0, 0, 1080, 1920);
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    const sunsetRay = ctx.createLinearGradient(0, 0, 1080, 1200);
+    sunsetRay.addColorStop(0, 'rgba(255, 125, 45, 0.36)');
+    sunsetRay.addColorStop(0.5, 'rgba(255, 75, 25, 0.20)');
+    sunsetRay.addColorStop(1, 'rgba(180, 45, 20, 0)');
+    ctx.fillStyle = sunsetRay;
+    ctx.fillRect(0, 0, 1080, 1920);
+    ctx.restore();
+  } else if (currentScene === 'bamboo'){
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    const bambooDark = ctx.createLinearGradient(0, 0, 0, 1920);
+    bambooDark.addColorStop(0, 'rgba(14, 46, 26, 0.52)');
+    bambooDark.addColorStop(0.5, 'rgba(18, 56, 32, 0.42)');
+    bambooDark.addColorStop(1, 'rgba(12, 38, 22, 0.52)');
+    ctx.fillStyle = bambooDark;
+    ctx.fillRect(0, 0, 1080, 1920);
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    const bambooGlow = ctx.createRadialGradient(540, 400, 60, 540, 540, 720);
+    bambooGlow.addColorStop(0, 'rgba(145, 240, 175, 0.28)');
+    bambooGlow.addColorStop(0.55, 'rgba(85, 185, 125, 0.15)');
+    bambooGlow.addColorStop(1, 'rgba(50, 140, 80, 0)');
+    ctx.fillStyle = bambooGlow;
+    ctx.fillRect(0, 0, 1080, 1920);
+    ctx.restore();
+  } else if (currentScene === 'lotus'){
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    const lotusDark = ctx.createLinearGradient(0, 0, 0, 1920);
+    lotusDark.addColorStop(0, 'rgba(56, 18, 40, 0.44)');
+    lotusDark.addColorStop(0.5, 'rgba(78, 24, 48, 0.36)');
+    lotusDark.addColorStop(1, 'rgba(46, 14, 32, 0.46)');
+    ctx.fillStyle = lotusDark;
+    ctx.fillRect(0, 0, 1080, 1920);
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    const lotusGlow = ctx.createRadialGradient(540, 480, 80, 540, 600, 700);
+    lotusGlow.addColorStop(0, 'rgba(255, 155, 195, 0.30)');
+    lotusGlow.addColorStop(0.5, 'rgba(235, 115, 165, 0.16)');
+    lotusGlow.addColorStop(1, 'rgba(180, 60, 120, 0)');
+    ctx.fillStyle = lotusGlow;
+    ctx.fillRect(0, 0, 1080, 1920);
+    ctx.restore();
+  } else if (currentScene === 'dawn'){
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    const dawnGlow = ctx.createLinearGradient(0, 0, 0, 1920);
+    dawnGlow.addColorStop(0, 'rgba(255, 205, 135, 0.30)');
+    dawnGlow.addColorStop(0.4, 'rgba(255, 225, 180, 0.18)');
+    dawnGlow.addColorStop(1, 'rgba(240, 230, 210, 0.14)');
+    ctx.fillStyle = dawnGlow;
+    ctx.fillRect(0, 0, 1080, 1920);
+    ctx.restore();
+  } else {
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    const hallGlow = ctx.createRadialGradient(540, 460, 60, 540, 550, 650);
+    hallGlow.addColorStop(0, 'rgba(255, 205, 110, 0.20)');
+    hallGlow.addColorStop(0.6, 'rgba(230, 160, 60, 0.10)');
+    hallGlow.addColorStop(1, 'rgba(200, 120, 40, 0)');
+    ctx.fillStyle = hallGlow;
+    ctx.fillRect(0, 0, 1080, 1920);
+    ctx.restore();
+  }
+
+  // Soft altar glow behind Buddha
+  const halo = ctx.createRadialGradient(540, 420, 20, 540, 420, 420);
+  halo.addColorStop(0, preset.haloColor || 'rgba(255,200,120,.35)');
+  halo.addColorStop(0.45, 'rgba(255,200,120,.14)');
+  halo.addColorStop(1, 'rgba(255,140,60,0)');
+  ctx.save(); ctx.fillStyle = halo; ctx.fillRect(0,0,1080,1920); ctx.restore();
 }
 function applySettings(){
   document.getElementById('title').textContent=settings.title||'Chánh Điện Tịnh Tâm';
   document.getElementById('subtitle').textContent=settings.subtitle||'Nam Mô A Di Đà Phật';
+  applySceneTheme(settings.scene || 'hall');
   duck(false); scheduleMo();
 }
 connect();
@@ -268,16 +590,51 @@ function bubble(text,x,y,s){
   ctx.beginPath(); ctx.moveTo(x-8,y); ctx.lineTo(x+8,y); ctx.lineTo(x,y+10); ctx.fill();
   ctx.fillStyle='#3a1a08'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(t,x,y-h/2+1);
 }
+function drawAltarMat(active, t){
+  const mx = PRAY_ALTAR.x, my = PRAY_ALTAR.y, mw = 136, mh = 42;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = active ? (0.5 + 0.18 * Math.sin(t * 3.5)) : 0.22;
+  const g = ctx.createRadialGradient(mx, my, 8, mx, my, 95);
+  g.addColorStop(0, 'rgba(255, 215, 120, .9)');
+  g.addColorStop(0.5, 'rgba(255, 160, 40, .4)');
+  g.addColorStop(1, 'rgba(255, 120, 20, 0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(mx - 110, my - 60, 220, 120);
+  ctx.restore();
+
+  ctx.save();
+  ctx.fillStyle = active ? 'rgba(130, 36, 18, .96)' : 'rgba(90, 24, 12, .92)';
+  ctx.beginPath();
+  ctx.ellipse(mx, my, mw / 2, mh / 2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.lineWidth = active ? 3 : 2;
+  ctx.strokeStyle = active ? '#ffd98a' : '#e2b04f';
+  ctx.stroke();
+
+  ctx.fillStyle = active ? '#fff0c2' : '#ffd98a';
+  ctx.font = '22px serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('❁', mx, my + 1);
+  ctx.restore();
+}
+
 let last=performance.now();
 function frame(now){
   requestAnimationFrame(frame); const dt=Math.min((now-last)/1000,.05); last=now; const t=now/1000;
-  ctx.clearRect(0,0,1080,1920);
-  if (A.hall.naturalWidth) ctx.drawImage(A.hall,0,0,1080,1920);
+  // background
+  drawSceneBackdrop(t);
   // light: halo pulse behind the Buddha, candle flicker, incense smoke
   haloPulse=Math.max(0,haloPulse-dt*.4);
   ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=.2+.08*Math.sin(t*1.2)+haloPulse*.5; sprite(A.halo,540,560,2.7+haloPulse*.35,.5); ctx.restore();
-  ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=.05+.035*Math.sin(t*9)*Math.sin(t*13.3); ctx.fillStyle='#ffb347'; ctx.fillRect(0,300,1080,800); ctx.restore();
+  const curPreset = SCENE_PRESETS[currentScene] || SCENE_PRESETS.hall;
+  ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=.05+.035*Math.sin(t*9)*Math.sin(t*13.3); ctx.fillStyle=curPreset.candleColor||'#ffb347'; ctx.fillRect(0,300,1080,800); ctx.restore();
   ctx.save(); ctx.fillStyle='#efe3cc'; for (let i=0;i<16;i++){ const a=(t*.08+i*.0625)%1; ctx.globalAlpha=.28*(1-a); ctx.beginPath(); ctx.arc(540+Math.sin(a*7+i)*20*a, 1000-a*280, 4+a*15, 0, 6.28); ctx.fill(); } ctx.restore();
+  // altar prayer mat (bồ đoàn lễ Phật)
+  const isSomeonePraying = [...visitors.values()].some(v => v.state === 'praying' || v.state === 'pray_kneel');
+  drawAltarMat(isSomeonePraying, t);
+
   // teachers
   for (const tc of TEACHERS){ if (tc.master){ ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=.35+.1*Math.sin(t*1.5); sprite(A.halo,tc.x,tc.y-120,.9,.5); ctx.restore(); }
     sprite(A[tc.skin],tc.x,tc.y,tc.s); tag(tc.name,tc.x,tc.y-tc.s*260-22,tc.s,'gold'); }
@@ -286,26 +643,206 @@ function frame(now){
   const list=[...visitors.values()].sort((a,b)=>a.y-b.y);
   for (const v of list){
     const anim=hasAnim(v.skin), s=v.seat?.scale||.4;
-    if (v.state==='walk' && v.seat){
-      const depth=(v.y-FLOOR.yTop)/(FLOOR.yBot-FLOOR.yTop), sp=(170+190*Math.max(0,Math.min(1.5,depth)))*dt, dx=v.seat.x-v.x, dy=v.seat.y-v.y;
-      if (Math.abs(dy)>3){ v.y+=Math.max(-sp,Math.min(sp,dy)); v.x+=(540-v.x)*Math.min(1,dt*6); v.flip=false; } else { v.x+=Math.max(-sp,Math.min(sp,dx)); v.flip=dx<0; }
-      v.ft+=dt; if (v.ft>.15){ v.ft=0; v.frame=(v.frame+1)%4; }
-      if (Math.abs(v.x-v.seat.x)<2 && Math.abs(v.y-v.seat.y)<3){ v.x=v.seat.x; v.y=v.seat.y; v.state='sitting'; v.sitT=0; v.flip=false; }
-    } else if (v.state==='sitting'){ v.sitT+=dt; v.frame=4+Math.min(3,Math.floor(v.sitT/.22)); if (v.sitT>.9){ v.state='sit'; v.frame=7; } }
-    else if (v.seat){ v.x+=(v.seat.x-v.x)*Math.min(1,dt*3); v.y+=(v.seat.y-v.y)*Math.min(1,dt*3); }      // glide when the grid grows
-    v.fade=Math.min(1,v.fade+dt*2); v.glow=Math.max(0,v.glow-dt*.45); v.bow=Math.max(0,v.bow-dt*.7);
-    const ws = v.state==='walk' ? (.26+.26*Math.max(0,Math.min(1,(v.y-FLOOR.yTop)/(FLOOR.yBot-FLOOR.yTop)))) * ((6/((GRID[cap]||GRID[24])[0]))**.7) : s;
-    if (v.glow>0 || v.skin==='master'){ ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=Math.max(v.glow*.75, v.skin==='master'?.35+.1*Math.sin(t*1.6):0);
-      const g=ctx.createRadialGradient(v.x,v.y-110*ws,8,v.x,v.y-110*ws,200*ws); g.addColorStop(0,'rgba(255,205,120,.95)'); g.addColorStop(1,'rgba(255,160,60,0)'); ctx.fillStyle=g; ctx.fillRect(v.x-230*ws,v.y-340*ws,460*ws,400*ws); ctx.restore(); }
-    const breathe = v.state==='sit' ? Math.sin(t*1.1+v.phase)*2*ws : 0, bowK = v.state==='sit' ? Math.sin(Math.min(1,v.bow)*Math.PI)*.04 : 0;
-    ctx.save(); ctx.globalAlpha=v.fade; ctx.translate(v.x,v.y); if (bowK) ctx.transform(1,0,0,1-bowK,0,0);
+    const isPrayingArea = v.state?.startsWith('pray_');
+    const ws = (v.state === 'walk' || isPrayingArea)
+      ? Math.max(0.28, (.26 + .26 * Math.max(0, Math.min(1.4, (v.y - FLOOR.yTop) / (FLOOR.yBot - FLOOR.yTop)))) * ((6 / ((GRID[cap] || GRID[24])[0])) ** .7))
+      : s;
+
+    const depth = (v.y - FLOOR.yTop) / (FLOOR.yBot - FLOOR.yTop);
+    const sp = (170 + 190 * Math.max(0, Math.min(1.5, depth))) * dt;
+
+    if (v.state === 'walk' && v.seat){
+      const dx = v.seat.x - v.x, dy = v.seat.y - v.y;
+      if (Math.abs(dy) > 3){ v.y += Math.max(-sp, Math.min(sp, dy)); v.x += (540 - v.x) * Math.min(1, dt * 6); v.flip = false; }
+      else { v.x += Math.max(-sp, Math.min(sp, dx)); v.flip = dx < 0; }
+      v.ft += dt; if (v.ft > .15){ v.ft = 0; v.frame = (v.frame + 1) % 4; }
+      if (Math.abs(v.x - v.seat.x) < 2 && Math.abs(v.y - v.seat.y) < 3){ v.x = v.seat.x; v.y = v.seat.y; v.state = 'sitting'; v.sitT = 0; v.flip = false; }
+    } else if (v.state === 'sitting'){
+      v.sitT += dt; v.frame = 4 + Math.min(3, Math.floor(v.sitT / .22));
+      if (v.sitT > .9){ v.state = 'sit'; v.frame = 7; }
+    } else if (v.state === 'pray_stand'){
+      v.standT = (v.standT || 0) + dt;
+      v.frame = 7 - Math.min(3, Math.floor(v.standT / 0.12));
+      if (v.standT > 0.45){
+        v.frame = 0;
+        v.state = Math.abs(v.x - 540) < 6 ? 'pray_walk_up' : 'pray_walk_out';
+      }
+    } else if (v.state === 'pray_walk_out'){
+      const dx = 540 - v.x;
+      v.flip = dx < 0;
+      v.x += Math.max(-sp, Math.min(sp, dx));
+      v.ft += dt; if (v.ft > .14) { v.ft = 0; v.frame = (v.frame + 1) % 4; }
+      if (Math.abs(v.x - 540) < 3){
+        v.x = 540; v.flip = false;
+        v.state = 'pray_walk_up';
+      }
+    } else if (v.state === 'pray_walk_up'){
+      const dy = PRAY_ALTAR.y - v.y;
+      v.x += (540 - v.x) * Math.min(1, dt * 8);
+      v.flip = false;
+      v.y += Math.max(-sp, Math.min(sp, dy));
+      v.ft += dt; if (v.ft > .14) { v.ft = 0; v.frame = (v.frame + 1) % 4; }
+      if (Math.abs(v.y - PRAY_ALTAR.y) < 3){
+        v.x = PRAY_ALTAR.x; v.y = PRAY_ALTAR.y;
+        v.state = 'pray_kneel';
+        v.sitT = 0;
+      }
+    } else if (v.state === 'pray_kneel'){
+      v.sitT = (v.sitT || 0) + dt;
+      v.frame = 4 + Math.min(3, Math.floor(v.sitT / 0.18));
+      if (v.sitT > 0.72){
+        v.state = 'praying';
+        v.frame = 7;
+        v.prayT = 0;
+        v.bowCount = 0;
+        v.bowBellTriggered = -1;
+        v.glow = 1.2;
+        for (let i = 0; i < 8; i++) petals.push({
+          x: 540 + (Math.random() - 0.5) * 80, y: 1150,
+          vx: (Math.random() - 0.5) * 30, vy: -(50 + Math.random() * 60),
+          t: 0, life: 2.2, s: 0.15 + Math.random() * 0.1
+        });
+      }
+    } else if (v.state === 'praying'){
+      v.frame = 7;
+      v.prayT = (v.prayT || 0) + dt;
+      const BOW_CYCLE = 2.4;
+      const curIndex = Math.floor(v.prayT / BOW_CYCLE);
+      const cycleT = v.prayT % BOW_CYCLE;
+
+      if (cycleT >= 0.9 && v.bowBellTriggered !== curIndex && curIndex < v.maxBows){
+        v.bowBellTriggered = curIndex;
+        v.bowCount = curIndex + 1;
+        bell(curIndex === (v.maxBows - 1));
+        v.glow = 1.0;
+        haloPulse = Math.max(haloPulse, 0.6);
+        for (let i = 0; i < 6; i++) petals.push({
+          x: 540 + (Math.random() - 0.5) * 70, y: 1140,
+          vx: (Math.random() - 0.5) * 35, vy: -(60 + Math.random() * 70),
+          t: 0, life: 2.5, s: 0.16 + Math.random() * 0.12
+        });
+      }
+
+      if (curIndex >= v.maxBows){
+        v.glow = 1.4;
+        v.state = 'pray_stand_up';
+        v.standT = 0;
+        nextPray();
+      }
+    } else if (v.state === 'pray_stand_up'){
+      v.standT = (v.standT || 0) + dt;
+      v.frame = 7 - Math.min(3, Math.floor(v.standT / 0.12));
+      if (v.standT > 0.45){
+        v.frame = 0;
+        v.state = 'pray_walk_down';
+      }
+    } else if (v.state === 'pray_walk_down'){
+      const targetY = v.seat?.y || 1500;
+      const dy = targetY - v.y;
+      v.x += (540 - v.x) * Math.min(1, dt * 8);
+      v.flip = false;
+      v.y += Math.max(-sp, Math.min(sp, dy));
+      v.ft += dt; if (v.ft > .14) { v.ft = 0; v.frame = (v.frame + 1) % 4; }
+      if (Math.abs(v.y - targetY) < 3){
+        v.y = targetY;
+        v.state = Math.abs(v.x - (v.seat?.x || 540)) < 6 ? 'sitting' : 'pray_walk_in';
+        v.sitT = 0;
+      }
+    } else if (v.state === 'pray_walk_in'){
+      const targetX = v.seat?.x || 540;
+      const dx = targetX - v.x;
+      v.flip = dx < 0;
+      v.x += Math.max(-sp, Math.min(sp, dx));
+      v.ft += dt; if (v.ft > .14) { v.ft = 0; v.frame = (v.frame + 1) % 4; }
+      if (Math.abs(v.x - targetX) < 3){
+        v.x = targetX;
+        v.flip = false;
+        v.state = 'sitting';
+        v.sitT = 0;
+      }
+    } else if (v.seat){
+      v.x += (v.seat.x - v.x) * Math.min(1, dt * 3);
+      v.y += (v.seat.y - v.y) * Math.min(1, dt * 3);
+    }
+    v.fade = Math.min(1, v.fade + dt * 2);
+    v.glow = Math.max(0, v.glow - dt * .45);
+    v.bow = Math.max(0, v.bow - dt * .7);
+
+    if (v.glow > 0 || v.skin === 'master'){
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = Math.max(v.glow * .75, v.skin === 'master' ? .35 + .1 * Math.sin(t * 1.6) : 0);
+      const g = ctx.createRadialGradient(v.x, v.y - 110 * ws, 8, v.x, v.y - 110 * ws, 200 * ws);
+      g.addColorStop(0, 'rgba(255,205,120,.95)');
+      g.addColorStop(1, 'rgba(255,160,60,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(v.x - 230 * ws, v.y - 340 * ws, 460 * ws, 400 * ws);
+      ctx.restore();
+    }
+
+    let bowSquash = 1, bowOffsetY = 0, bowK = 0;
+    if (v.state === 'praying'){
+      const BOW_CYCLE = 2.4;
+      const cycleT = (v.prayT || 0) % BOW_CYCLE;
+      if (cycleT < 0.85){
+        const p = cycleT / 0.85;
+        const e = Math.sin(p * Math.PI / 2);
+        bowSquash = 1 - 0.52 * e;
+        bowOffsetY = 14 * ws * e;
+      } else if (cycleT < 1.45){
+        bowSquash = 0.48;
+        bowOffsetY = 14 * ws;
+      } else if (cycleT < 2.2){
+        const p = (cycleT - 1.45) / 0.75;
+        const e = Math.sin((1 - p) * Math.PI / 2);
+        bowSquash = 1 - 0.52 * e;
+        bowOffsetY = 14 * ws * (1 - p);
+      } else {
+        bowSquash = 1;
+        bowOffsetY = 0;
+      }
+    } else if (v.state === 'sit'){
+      bowK = Math.sin(Math.min(1, v.bow) * Math.PI) * .04;
+    }
+
+    const breathe = (v.state === 'sit' || v.state === 'praying') ? Math.sin(t * 1.1 + v.phase) * 2 * ws : 0;
+    const walkBob = (!anim && (v.state === 'walk' || v.state?.startsWith('pray_walk_'))) ? Math.sin((v.ft || 0) * 16) * 3 * ws : 0;
+
+    ctx.save();
+    ctx.globalAlpha = v.fade;
+    ctx.translate(v.x, v.y + bowOffsetY + walkBob);
+    if (v.state === 'praying'){
+      ctx.transform(1, 0, 0, bowSquash, 0, 0);
+    } else if (bowK){
+      ctx.transform(1, 0, 0, 1 - bowK, 0, 0);
+    }
+
     let topY;
-    if (anim){ const a=ANIM[v.skin], k=ws*1.05*260/a.seatH; if (v.flip) ctx.scale(-1,1); ctx.drawImage(A['anim_'+v.skin], v.frame*a.fw,0,a.fw,a.fh, -a.fw*k/2, -a.fh*k+breathe, a.fw*k, a.fh*k); topY=(v.state==='sit'?a.seatH:a.fh*.97)*k; }
-    else { const sk = v.skin==='master'?'monk':v.skin; sprite(A[sk]||A.man,0,breathe,ws*1.05); topY=260*ws; }
+    if (anim){
+      const a = ANIM[v.skin], k = ws * 1.05 * 260 / a.seatH;
+      if (v.flip) ctx.scale(-1, 1);
+      ctx.drawImage(A['anim_' + v.skin], v.frame * a.fw, 0, a.fw, a.fh, -a.fw * k / 2, -a.fh * k + breathe, a.fw * k, a.fh * k);
+      topY = ((v.state === 'sit' || v.state === 'praying' || v.state === 'pray_kneel') ? a.seatH : a.fh * .97) * k;
+    } else {
+      const sk = v.skin === 'master' ? 'monk' : v.skin;
+      sprite(A[sk] || A.man, 0, breathe, ws * 1.05);
+      topY = 260 * ws;
+    }
     ctx.restore();
-    const ty=v.y-topY-14*ws/.4;
-    tag(v.name, v.x, ty, ws, v.skin==='master'||v.coins>=99?'gold':'', avatar(v.avatar), v.state==='sit' ? v.seat?.gap : 0);
-    if (v.bubble && now<v.bubble.until) bubbles.push([v.bubble.text, v.x, ty-Math.max(18,30*ws/.4), ws]); else v.bubble=null;
+
+    let tagStyle = (v.skin === 'master' || v.coins >= 99 || isPrayingArea) ? 'gold' : '';
+    let displayName = v.name;
+    if (v.state === 'praying'){
+      displayName = `✦ ${v.name} · Lạy Phật (${Math.min(v.maxBows, (v.bowCount || 0) + 1)}/${v.maxBows}) ✦`;
+    } else if (v.state === 'pray_walk_up' || v.state === 'pray_walk_out' || v.state === 'pray_kneel'){
+      displayName = `❁ ${v.name} · Tiến Lễ`;
+    } else if (v.state === 'pray_stand_up' || v.state === 'pray_walk_down' || v.state === 'pray_walk_in'){
+      displayName = `❁ ${v.name} · Tạ Lễ`;
+    }
+
+    const ty = v.y - (topY * (v.state === 'praying' ? bowSquash : 1)) - 14 * ws / .4;
+    tag(displayName, v.x, ty, ws, tagStyle, avatar(v.avatar), v.state === 'sit' ? v.seat?.gap : 0);
+    if (v.bubble && now < v.bubble.until) bubbles.push([v.bubble.text, v.x, ty - Math.max(18, 30 * ws / .4), ws]);
+    else v.bubble = null;
   }
   for (const b of bubbles) bubble(...b);
   // gift icons rising, petals / hearts
