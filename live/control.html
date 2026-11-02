@@ -76,12 +76,22 @@ button.red{background:var(--red);border-color:#b84a33}
     <label for="simText">Bình luận / lời nguyện</label>
     <input id="simText" value="Nam mô A Di Đà Phật, cầu gia đình bình an">
     <div class="row"><button id="btnChat">Gửi bình luận</button></div>
+    <div class="row" style="margin-top:6px;gap:6px;flex-wrap:wrap">
+      <span style="font-size:12px;opacity:.8;align-self:center">Đổi nhanh:</span>
+      <button type="button" class="btnSkinQuick" data-skin="1">1 👦 Nam</button>
+      <button type="button" class="btnSkinQuick" data-skin="2">2 👧 Nữ</button>
+      <button type="button" class="btnSkinQuick" data-skin="3">3 👵 Bà</button>
+      <button type="button" class="btnSkinQuick" data-skin="4">4 🧘 Sư</button>
+      <button type="button" class="btnSkinQuick" data-skin="5">5 🧕 Ni</button>
+      <button type="button" class="btnSkinQuick" data-skin="6">6 🧒 Tiểu</button>
+      <button type="button" class="btnSkinQuick" data-skin="7">7 🪷 Cao tăng</button>
+    </div>
     <div class="row">
       <button data-gift="Hoa hồng" data-dia="1">Hoa hồng · 1</button>
       <button data-gift="Đèn hoa sen" data-dia="30">Hoa sen · 30</button>
       <button data-gift="Chuông vàng" data-dia="199">Chuông · 199</button>
     </div>
-    <p class="hint">🎁 Tặng quà sẽ kích hoạt Phật tử <b>tiến lên trước bàn thờ lạy Phật</b>.<br>Gõ <b>nam · nữ · sư · ni · tiểu · bà · cao tăng</b> làm bình luận để đổi hình.</p>
+    <p class="hint">🎁 Tặng quà sẽ kích hoạt Phật tử <b>tiến lên trước bàn thờ lạy Phật</b>.<br>Gõ số <b>1 - 7</b> hoặc tên <b>nam · nữ · bà · sư · ni · tiểu · cao tăng</b> để đổi nhân vật.</p>
     <h2>Đổ người mẫu</h2>
     <div class="row"><button data-fill="15">15</button><button data-fill="36">36</button><button data-fill="64">64</button><button data-fill="100">100</button></div>
     <button class="red" id="btnClear">Làm trống toàn bộ bồ đoàn</button>
@@ -119,12 +129,10 @@ button.red{background:var(--red);border-color:#b84a33}
     <label>Dòng phụ<input id="subtitle" value="Nam Mô A Di Đà Phật"></label>
     <div class="row">
       <label>Khung cảnh<select id="scene">
-        <option value="hall">Sân chùa</option>
-        <option value="dawn">Sớm mai</option>
-        <option value="moon">Trăng đêm</option>
-        <option value="lotus">Sen hương</option>
-        <option value="sunset">Hoàng hôn</option>
-        <option value="bamboo">Rừng trúc</option>
+        <option value="hall">🛕 Trong Chánh Điện</option>
+        <option value="outside">🏯 Ngoài Chánh Điện (Tiền điện)</option>
+        <option value="courtyard">🌳 Ngoài Sân Chùa (Khuôn viên Sân chùa)</option>
+        <option value="bamboo">🎋 Rừng Trúc Thiền Viện</option>
       </select></label>
       <label>Số chỗ ngồi<select id="seatMode"><option value="auto">Tự mở rộng 24 → 100</option><option value="24">24</option><option value="36">36</option><option value="64">64</option><option value="100">100</option></select></label>
     </div>
@@ -136,7 +144,7 @@ button.red{background:var(--red);border-color:#b84a33}
   <h2>Nhật ký</h2>
   <div id="log" aria-live="polite"></div>
 </section>
-<footer class="hint" style="margin-top:14px;text-align:center">Chánh Điện Online · mã nguồn mở MIT · thực hiện bởi Kent Juno</footer>
+<footer class="hint" style="margin-top:14px;text-align:center">Chánh Điện Online · Develop by Vo Nam ·</footer>
 
 <script>
 const $ = id => document.getElementById(id);
@@ -183,6 +191,10 @@ $('btnOverlay').onclick = () => window.open('/live/overlay.html', 'overlay916', 
 $('btnUnmute').onclick = () => send('unmute');
 $('btnReload').onclick = () => send('reload');
 $('btnChat').onclick = () => send('chat', { name: $('simName').value, text: $('simText').value });
+document.querySelectorAll('.btnSkinQuick').forEach(b => b.onclick = () => {
+  $('simText').value = b.dataset.skin;
+  $('btnChat').click();
+});
 document.querySelectorAll('[data-gift]').forEach(b => b.onclick = () => send('gift', { name: $('simName').value, gift: b.dataset.gift, diamonds: +b.dataset.dia, count: 1 }));
 document.querySelectorAll('[data-fill]').forEach(b => b.onclick = () => send('fill', { n: +b.dataset.fill }));
 $('btnClear').onclick = () => send('clear');
